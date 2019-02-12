@@ -1,0 +1,163 @@
+\documentclass[article]{jss}
+\usepackage[utf8]{inputenc}
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+
+\author{
+Paul-Christian Bürkner\\University of Münster
+}
+\title{Bayesian Item Response Modelling in \proglang{R} Using \pkg{brms} and
+\proglang{Stan}}
+
+\Plainauthor{Paul-Christian Bürkner}
+\Plaintitle{Bayesian Item Response Modelling in R Using brms and Stan}
+\Shorttitle{Bayesian IRT Modelling Using \pkg{brms}}
+
+\Abstract{
+Item Response Theory (IRT) is widely applied in the social sciences to
+model persons' responses on a set of items measuring one or more
+dimensions. While several R packages have been developed that implement
+IRT models, they are each limited to a few sub-classes of models.
+Unfortunately, model specification syntax and post-processing methods
+are rather inconsistent across packages making it hard for users to
+switch between models implemented in the different packages. Further,
+most implementations are frequentist while the availibility of Bayesian
+methods remains comparably limited. We demonstrate how to use the R
+package brms and Stan to specify and fit a wide range of Bayesian IRT
+models using well known multilevel formula syntax. Further, item and
+person parameters can be related in both a linear or non-linear manner.
+Discrete, ordinal, and continuous responses are supported. Common IRT
+model classes of the presented framework include 1PL and 2PL logistic
+models optionally also containing guessing parameters, graded response
+and partial credit ordinal models, as well as drift diffusion models of
+response times coupled with binary decisions. Posterior distributions of
+item and person parameters can be conveniently extracted and summarized.
+Model fit can be evaluated and compared using Bayes factors and
+approximate cross-validation procedures.
+}
+
+\Keywords{Item Response Theory, Bayesian Statistics, \proglang{R}, \proglang{Stan}, \pkg{brms}}
+\Plainkeywords{Item Response Theory, Bayesian Statistics, R, Stan, brms}
+
+%% publication information
+%% \Volume{50}
+%% \Issue{9}
+%% \Month{June}
+%% \Year{2012}
+%% \Submitdate{}
+%% \Acceptdate{2012-06-04}
+
+\Address{
+    Paul-Christian Bürkner\\
+  University of Münster\\
+  Fliednerstr. 21, 48149 Münster, Germany\\
+  E-mail: \email{paul.buerkner@gmail.com}\\
+  URL: \url{https://paul-buerkner.github.io/}\\~\\
+  }
+
+% Pandoc header
+
+\usepackage{amsmath}
+
+\begin{document}
+
+\hypertarget{introduction}{%
+\section{Introduction}\label{introduction}}
+
+\hypertarget{model-description-and-formula-syntax}{%
+\section{Model description and formula
+syntax}\label{model-description-and-formula-syntax}}
+
+\hypertarget{parameter-estimation-and-post-processing}{%
+\section{Parameter estimation and
+post-processing}\label{parameter-estimation-and-post-processing}}
+
+The \pkg{brms} package does not fit models itself but uses \pkg{Stan}
+\citep{carpenter2017} on the back-end. Accordingly, all samplers
+implemented in \pkg{Stan} can be used to fit \pkg{brms} models. The
+flagship algorithm of Stan is an adaptive Hamiltonian Monte-Carlo (HMC)
+sampler \citep{betancourt2014, betancourt2017, stanM2019}, which
+progressed from the No-U-Turn Sampler (NUTS) by \cite{hoffman2014}.
+HMC-like algorithms produce posterior samples that are much less
+autocorrelated than those of other samplers such as the random-walk
+Metropolis algorithm \citep{hoffman2014, creutz1988}. What is more,
+consequtive samples may even be anti-correlated leading to higher
+efficiency than completely independent samples \citep{gelman2014}. The
+main drawback of this increased efficiency is the need to calculate the
+gradient of the log-posterior, which can be automated using algorithmic
+differentiation \citep{griewank2008} but is still a time-consuming
+process for more complex models. Thus, using HMC leads to higher quality
+samples but takes more time per sample than other algorithms typically
+applied. Another drawback of HMC is the need to pre-specify at least two
+parameters, which are both critical for the performance of HMC. The
+adaptive HMC Sampler of Stan allows setting these parameters
+automatically thus eliminating the need for any hand-tuning, while still
+being at least as efficient as a well tuned HMC \citep{hoffman2014}. For
+more details on the sampling algorithms applied in \pkg{Stan}, see the
+\pkg{Stan} user's manual \citep{stanM2019} as well as
+\cite{hoffman2014}.
+
+After the estimation of the parameters' joint posterior distribution,
+\pkg{brms} offers a wide range of post-processing options of which
+several are helpful in an IRT context. Below, we introduce the most
+important post-processing options. We will show their usage in hands-on
+examples in the upcoming sections. For a quick numerical and graphical
+summary, respectively, of the central model parameters, we recommend the
+\code{summary} and \code{plot} methods. The posterior distribution of
+person parameters (and, if also modeled as varying effects, item
+parameters) can be extracted with the \code{coef} method. The
+\code{hypothesis} method can be used to easily compute and evaluate
+parameter contrasts, for instance, when the goal is to compare the
+difficulty of two items or the ability of two persons. A visualization
+of the effects of item or person covariates is readily available via the
+\code{marginal_effects} method.
+
+With the help of the \code{posterior_predict} method, \pkg{brms} allows
+drawing samples from the posterior predictive distribution. This not
+only allows to make predictions for existing and new data, but also
+enables the comparison between the actual response \(y\) and the
+response \(\hat{y}\) predicted by the model. Such comparisons can be
+visualized in the form of posterior-predictive checks by means of the
+\code{pp_check} method \citep{gabry2019}. Further, via the
+\code{log_lik} method, the pointwise log-likelihood can be obtained,
+which can be used, among others, for various cross-validation methods.
+Possibly the most widely known cross-validation approach is
+leave-one-out cross-validation \citep[LOO-CV;][]{vehtari2017loo}, for
+which an approximate version is available via the \code{loo} method of
+the \pkg{loo} package \citep{vehtari2017loo, vehtari2017psis}. If LOO-CV
+is not an option or if the approximation fails, exact k-fold
+cross-valdiation is available via the \code{kfold} method. The
+cross-validation results can be further post-processed for the purpose
+of comparison, selection, or averaging of models. In these contexts, the
+\code{loo_compare}, \code{model_weights}, and \code{pp_average} methods
+are particularily helpful.
+
+In addition to cross-validation based fit measures, the marginal
+likelihood (i.e., the denomintor in Bayes' theorem) and marginal
+likelihood ratios, commonly known as Bayes factors, can be used for
+model comparison, selection, or averaging as well \citep{kass1995}. In
+general, obtaining the marginal likelihood of a model is a
+computationally demanding task \citep{kass1995}. In \pkg{brms} this is
+realized via bridgesampling \citep{meng1996, meng2002} as implemented in
+the \pkg{bridgesampling} package \citep{bridgesampling}. The
+corresponding methods are called \code{bridge_sampler} to obtain (log)
+marginal likelihood estimates, \code{bayes_factor} to obtain Bayes
+factors and \code{post_prob} to obtain posterior model probabilities
+based on prior model probabilities and marginal likelihood estimates.
+
+\hypertarget{binary-models}{%
+\section{Binary Models}\label{binary-models}}
+
+\hypertarget{ordinal-models}{%
+\section{Ordinal Models}\label{ordinal-models}}
+
+\hypertarget{response-times-models}{%
+\section{Response Times Models}\label{response-times-models}}
+
+\renewcommand\refname{Conclusion}
+\bibliography{Bayesian-IRT.bib}
+
+
+\end{document}
+
