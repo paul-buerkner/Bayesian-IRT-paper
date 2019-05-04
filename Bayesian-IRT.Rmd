@@ -1,20 +1,20 @@
 ---
 author:
   - name: Paul-Christian Bürkner
-    affiliation: University of Münster
+    affiliation: Aalto University, Department of Computer Science
     address: >
-      Fliednerstr. 21,
-      48149 Münster, Germany
+      Konemiehentie 2,
+      02150 Espoo, Finland
     email: \email{paul.buerkner@gmail.com}
     url: https://paul-buerkner.github.io/
 title:
-  formatted: "Bayesian Item Response Modelling in \\proglang{R} Using \\pkg{brms} and \\proglang{Stan}"
   # If you use tex in the formatted title, also supply version without
-  plain:     "Bayesian Item Response Modelling in R Using brms and Stan"
   # For running headers, if needed
-  short:     "Bayesian IRT Modelling Using \\pkg{brms}"
+  formatted: "Bayesian Item Response Modelling in \\proglang{R} with \\pkg{brms} and \\proglang{Stan}"
+  plain:     "Bayesian Item Response Modelling in R with brms and Stan"
+  short:     "Bayesian IRT Modelling with \\pkg{brms}"
 abstract: >
-  Item Response Theory (IRT) is widely applied in the social sciences to model persons’ responses on a set of items measuring one or more dimensions. While several R packages have been developed that implement IRT models, they are each limited to a few sub-classes of models. Unfortunately, model specification syntax and post-processing methods are rather inconsistent across packages making it hard for users to switch between models implemented in the different packages. Further, most implementations are frequentist while the availibility of Bayesian methods remains comparably limited. We demonstrate how to use the R package brms and Stan to specify and fit a wide range of Bayesian IRT models using well known multilevel formula syntax. Further, item and person parameters can be related in both a linear or non-linear manner. Discrete, ordinal, and continuous responses are supported. Common IRT model classes of the presented framework include 1PL and 2PL logistic models optionally also containing guessing parameters, graded response and partial credit ordinal models, as well as drift diffusion models of response times coupled with binary decisions. Posterior distributions of item and person parameters can be conveniently extracted and summarized. Model fit can be evaluated and compared using Bayes factors and approximate cross-validation procedures.
+  Item Response Theory (IRT) is widely applied in the human sciences to model persons’ responses on a set of items measuring one or more dimensions. While several R packages have been developed that implement IRT models, they are each limited to certain prespecified classes of models. Further, most implementations are frequentist while the availability of Bayesian methods remains comparably limited. We demonstrate how to use the R package brms and Stan to specify and fit a wide range of Bayesian IRT models using flexible and intuitive multilevel formula syntax. Further, item and person parameters can be related in both a linear or non-linear manner. Various distributions for categorical, ordinal, and continuous responses are supported. Users may even define their own custom response distribution for use in the presented framework. Common IRT model classes that can be specified natively in the presented framework include 1PL and 2PL logistic models optionally also containing guessing parameters, graded response and partial credit ordinal models, as well as drift diffusion models of response times coupled with binary decisions. Posterior distributions of item and person parameters can be conveniently extracted and post-processed. Model fit can be evaluated and compared using Bayes factors and efficient cross-validation procedures.
 keywords:
   # at least one keyword must be supplied
   formatted: [Item Response Theory, Bayesian Statistics, "\\proglang{R}",
@@ -24,35 +24,845 @@ preamble: >
   \usepackage{amsmath}
 output: rticles::jss_article
 bibliography: Bayesian-IRT.bib
+header-includes:
+   - \usepackage{booktabs}
+   - \usepackage{threeparttable}
+editor_options: 
+  chunk_output_type: console
 ---
+
+```{r setup, cache = FALSE, include = FALSE}
+knitr::opts_chunk$set(
+  cache = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+options(
+	knitr.kable.NA = '',
+	width = 160
+)
+```
+
+
+```{r packages, cache = FALSE, include = FALSE}
+library(knitr)
+library(kableExtra)
+library(tidyverse)
+library(patchwork)
+library(brms)
+
+# set ggplot theme
+theme_set(bayesplot::theme_default())
+
+# set rstan options
+rstan::rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+```
 
 # Introduction
 
-# Model description and formula syntax
+Item Response Theory (IRT) is widely applied in the human sciences to model
+persons’ responses on a set of items measuring one
+or more dimensions. Over the years, a multitude of software packages have been
+developed that implement IRT models. To date, most free and open source software
+in the field of IRT is written in the programming language \proglang{R} [@R],
+which has grown to become one of the primary languages for statistical
+computing. Examples for widely applied and actively maintained IRT specific
+\proglang{R} packages are \pkg{eRm} [@eRm], \pkg{ltm} [@ltm], \pkg{TAM}
+[@TAM], \pkg{mirt} [@mirt], and \pkg{sirt} [@sirt]. Each of them supports
+certain classes of IRT models and related post-processing methods. Further, IRT
+models may also be specified in general purpose multilevel or structural
+equation modeling packages such as \pkg{lme4} [@lme4] or \pkg{lavaan} [@lavaan].
+We will provide a review and comparison of these package later on in Section
+\ref{comparison}.
 
-# Parameter estimation and post-processing
+In this paper, we present a Bayesian IRT framework based on the \proglang{R}
+package \pkg{brms} [@brms1; @brms2] and the probabilistic programming language
+\proglang{Stan} [@carpenter2017]. Our framework is quite extensive both in the
+models that can be specified and in the supported post-processing methods. Users
+can choose from over 40 built-in response distributions, which not only include
+standard IRT models such as binary, categorical or ordinal models, but also
+models for count data, response times or proportions to name only a few
+available options. Users may also write their own custom response distributions
+more IRT models not natively supported by \pkg{brms}. The non-linear multilevel
+formula syntax of \pkg{brms} allows for a flexible yet concise specification of
+multidimensional IRT models, with an arbitrary number of person or item
+covariates and multilevel structure if required. Prior knowledge can be included
+in the form prior distribution, which constitute an essential part of every
+Bayesian model. Estimation is performed in \proglang{Stan} using MCMC sampling
+via adaptive Hamiltonian Monte Carlo [@hoffman2014; @stanM2019], an efficient
+and stable algorithm that works well in high dimensional, highly correlated
+parameter spaces. Although the \pkg{brms} framework does not only focus
+on IRT models, recent developments and new features presented in this paper
+make it particularily appealing for fitting those models.
 
-The \pkg{brms} package does not fit models itself but uses \pkg{Stan} [@carpenter2017] on the
-back-end. Accordingly, all samplers implemented in \pkg{Stan} can be used to fit
-\pkg{brms} models. The flagship algorithm of Stan is an adaptive Hamiltonian
-Monte-Carlo (HMC) sampler [@betancourt2014;@betancourt2017;@stanM2019], which 
-progressed from the No-U-Turn Sampler
-(NUTS) by \cite{hoffman2014}. HMC-like algorithms produce posterior samples that
-are much less autocorrelated than those of other samplers such as the
-random-walk Metropolis algorithm \citep{hoffman2014, creutz1988}. What is more,
-consequtive samples may even be anti-correlated leading to higher efficiency than
-completely independent samples [@gelman2014]. The main drawback of this increased
-efficiency is the need to calculate the gradient of the log-posterior, which can
-be automated using algorithmic differentiation \citep{griewank2008} but is still
-a time-consuming process for more complex models. Thus, using HMC leads to
+The paper is structured as follows: In Section \ref{model}, we describe the
+model structure of the presented framework and, in Section \ref{brms}, the
+advanced \proglang{R} formula syntax to specify IRT models in that framework. In
+Section \ref{estimation} we discuss how models are estimated and post-processed
+before we continue with several hands-on examples in Section \ref{examples}.
+Further, we provide a comparison of IRT supporting \proglang{R} packages in
+Section \ref{comparison} and end with a conclusion in Section \ref{conclusion}.
+
+# Model description {#model}
+
+The core of models implemented in \pkg{brms} is the prediction of the response
+$y$ through predicting all $K$ parameters $\psi_k$ of the response distribution $D$. We write
+
+$$
+y_n \sim D(\psi_{1n}, \psi_{2n}, \ldots, \psi_{Kn})
+$$
+
+to stress the dependency on the $n\textsuperscript{th}$ observation. In most
+\proglang{R} packages, the response distribution is called the model
+\code{family} and we adopt this term in \pkg{brms}. Writing down the model per
+observation $n$ implies that we think of the data in long rather than in wide
+format. That is, reponses to different items go in the same column of the data
+set rather than in different columns. The long format works well in combination
+with multilevel formula syntax and is arguably also more favourable from a programatical perspective [e.g., see @wickham2016].
+
+## Response distributions {#respdists}
+
+The response format of the items will critically determine which distribution
+$D$ is appropriate to model persons responses on the items. In this section, we
+will briefly review some common response distributions in IRT that are natively
+supported in the proposed framework. A complete overview of all supported
+response distributions is provided as a package vignette 
+(run `vignette("brms_families")` after loading \pkg{brms}).
+In addition, users may also define their own custom response distributions, which
+can be made fully compatible with all modeling and post-processing options of
+the framework (run `vignette("brms_customfamilies")`).
+
+If the response $y$ is a binary success (1) vs. failure (0) indicator, the
+canonical family is the *Bernoulli* distribution with density
+
+$$
+y \sim \text{Bernoulli}(\psi) = \psi^y (1-\psi)^{1-y},
+$$
+where $\psi \in [0, 1]$ can be interpreted as the success probability. Common
+IRT models than can be built on top of the bernoulli distribution are the 1, 2,
+and 3 parameter logistic models [1PL, 2PL, and 3PL models; @agresti2010], which
+we will discuss in more detail in Sections \ref{predDP} and \ref{binary}.
+
+If $y$ consitutes a categorical response with $C > 1$ unordered categories, the
+*categorical* distribution is appropriate [@agresti2010]. It has the density
+
+$$
+y \sim \text{categorical}(\psi_1, \ldots, \psi_C) = \prod_{c = 1}^C \psi_c^{I_k(y)}
+$$
+
+with cateory probabilities $P(y = c) = \psi_c > 0$ and $\sum_{c=1}^C \psi_c = 1$ where $I_c(y)$ is the indicator function which evaluates to $1$ if $y = k$ and to $0$
+otherwise. For $C = 2$, the categorical distribution is equivalent to the
+Bernoulli distribution.
+
+If $y$ is an ordinal categorical response with $C$ ordered categories, multiple
+possible response distributions are plausible [for details see @buerkner2019].
+They are all built on top of the categorical distribution but differ in how they
+define the category probabilities $P(y = c)$. The two most commonly applied
+ordinal families in IRT are the *cumulative* model [@agresti2010], which assumes
+
+$$
+P(y = c) = F(\tau_c - \psi) - F(\tau_{c-1} - \psi)
+$$
+where $F$ is the cumulative distribution function (CDF) of a continuous unbounded distribution and $\tau$ is a vector of $C-1$ ordered thresholds. If $F$ is the standard logistic distribution, the resuling IRT model is called *graded response model* [GRM; @samejima1997]. Alternatively, one can use the *adjacent category model* [ACM; @agresti2010], which, when combined with the logistic distribution, 
+becomes the *partial credit model* [PCM; @rasch1961]. It assumes
+
+$$
+P(y = c) = \frac{\exp \left(\sum_{j=1}^{c-1} (\psi -\tau_{j}) \right)}
+  {\sum_{r=1}^{C} \exp\left(\sum_{j=1}^{r-1} (\psi -\tau_{j}) \right)}
+$$ 
+
+with threshold vector $\tau$ whose element do not necessarily need to be ordered
+[@adams2012]. The PCM is widely applied in IRT for instance in various large scale
+assessment studies such as PISA [@oecd2017]. We will provides hands-on examples
+of ordinal IRT models in Section \ref{ordinal}.
+
+If $y$ consitutes a count variable without a natural upper bound (or an
+upper bound that is practically not reachable, for instance in dedicated 
+speed tests), the *Poisson* distribution with density
+
+$$
+y \sim \text{Poisson}(\psi) = \frac{\psi^y \exp(-\psi)}{y!},
+$$
+
+or one of its various generalizations [e.g., see @shmueli2005], may be
+an appropriate choice. In IRT, this leads to what is known as the
+*Rasch-Poisson-Counts model* [RPCM; @rasch1960].
+
+When items consist of a comparative judgement between $C$ categorical
+alternatives on a continuous bounded scale, obtained responses are in a
+"proportion-of-total" (compositional) format [@hijazi2009]. That is, for each response
+category $c$, $y_c \in [0, 1]$ is the proportion of the total points that was
+assigend to that category so that $\sum_{c=1}^C y_c = 1$. If $C = 2$, the
+response $y = y_1$ on the first category can be modeled as *beta* distributed
+(as $y_2 = 1 - y_1$ is redundant). The mean-precision parameterization of the
+beta distribution  has density
+
+$$
+y \sim \text{Beta}(\psi_1 = \mu, \psi_2 = \phi) = \frac{y^{\mu \phi - 1} (1-y)^{(1-\mu) \phi-1}}{B(\mu \phi, (1-\mu) \phi)}
+$$
+
+where $B$ is the beta function. A multivariate generalization of the Beta family
+is the **Dirichlet** family, which can be used for compositional scores of more
+than two response categories [@hijazi2009]. On the full response vector $y =
+(y_1, ..., y_C)$ it has density
+
+$$
+y \sim \text{Dirichlet}(\psi_1, \ldots \psi_C, \psi_{C+1} = \phi) = 
+ \frac{1}{B((\psi_{1}, \ldots, \psi_{K}) \phi)} 
+ \prod_{k=1}^K y_{k}^{\psi_{k} \phi - 1}.
+$$
+
+Another important class of IRT models deals with response/reaction times, which
+tend to vary over items and persons in at least three ways: mean, variation, and
+right skewness of the responses. Accordingly, sufficiently flexible response
+distributions on reaction times are likely to require three parameters in order
+to capture these aspects. Two commonly applied 3-parameter distributions are the
+exponentially-modified Gaussian (exgaussian) distribution and the shifted
+lognormal distribution [@heathcote1991; @wagenmakers2007]. Their densities are a
+little bit more involved and so we do not display them here, but they can be
+found for instance in @wagenmakers2007 or when running
+`vignette("brms_families")` in \proglang{R}. With the exgaussian distribution,
+we can directly parameterize the mean which simplifies interpreation of model
+parameters, at the expense of having a theoretically less justified model
+[@heathcote1991]. We will provide a practical example of analyzing response
+times in an IRT context in Section \ref{response-times}.
+
+Going on step further, it is often favorable to model persons' responses
+together with the corresponding response times in a joint process model. This
+not only to implies a more appropriate generative model for the data but may
+also fosters theoretical understanding on the underlying processes
+[@ratcliff1978;
+@vandermaas2011]. One of these joint models, which can handle binary decisions
+together with their response times, is the Wiener drift diffusion model
+[@ratcliff1978; @vandermaas2011]. Its parameters have meaning in the context of
+cognitive decision process described as a wiener diffusion process with a drift
+towards one or the other binary choice alternative. The parameters of the four
+parameter drift diffusion model implemented in the presented framework are (1)
+the drift rate that describes persons tendency towards one or the other two
+alternative, (2) the boundary separation that describes how much evidence needs
+to be accumulated until a decision is made, (3) the non-decision times that
+describes the time spend at processing the items and executing a motor response
+(i.e., everything non-decision related), and (4) the initial bias that describes
+persons tendency towards one of the two alternatives independent of the item
+properties. In IRT applications, it is common to fix the initial bias to $0.5$,
+that is to assume no initial bias towards one of the two alternatives
+[@diffIRT], which results in the three-parameter drift diffusion model. A more
+detailed discussion of the drift diffusion models is beyond the scope of the
+present paper, but can be found elsewhere [@ratcliff1978; @vandermaas2011;
+@diffIRT]. We will provide a practical example of fitting drift diffusion models
+to IRT data in Section \ref{response-times}.
+
+
+## Predicting distributional parameters {#predDP}
+
+In the context of IRT, every parameter $\psi_k$ can written as a function
+$\psi_{kn} = f_k(\theta_{kp_n}, \xi_{ki_n})$ of person parameters $\theta_{k}$
+and item parameters $\xi_{k}$, where $p_n$ and $i_n$ indicate the person and
+item, respectively, to which the $n\textsuperscript{th}$ observation
+belongs\footnote{A parameter may also be assumed constant across observations
+and thus be independent of person and item parameters.}. In a regression
+context, such models are often referred to as distributional regression models
+or as regression models of location, scale, and shape [@rigby2005] to stress the
+fact that all parameters of the distribution can be predicted, not just a single
+parameter -- usually the mean of the distribution or some other measure of
+centeral tendency.
+
+In addition to the response distribution itself, the exact form of the equations
+$\psi = f(\theta_p, \xi_i)$ (where we now suppress the indices $k$ and $n$ for
+simplicty) will critically define the meaning of the person and item parameters
+as well as the complexty of the model in general. In a linear model, $f$ is the
+identity function and the relation between $\theta_p$ and $\xi_i$ is linear and
+additive so that $\psi = \theta_p + \xi_i$. Unfortunately, such a model will not
+yield the desired results if $\psi$ has natural range restrictions. For
+instance, if the response $y$ is a binary success (1) vs. failure (0) indicator,
+and and we use the the Bernoulli response distribution, $\psi$ can be 
+interpreted as the success probability, which, by definition, must
+lie within the interval $[0, 1]$. However, a linear model $\psi = \theta_p +
+\xi_i$ may yield any real value and so is invalid when predicting probabilities.
+The solution for this problem is to use a non-linear function $f$ appropriate to
+the scale of the predicted parameter $\psi$. This results in what is known as a
+*generalized linear model* (GLM). That is, the predictor term $\eta = \theta_p +
+\xi_i$ is still linear but transformed, as a whole, by a non-linear function
+$f$, which is commonly called 'response function'. For Bernoulli distributions,
+we can canonically use the logistic response function
+
+$$
+f(\eta) = \text{logistic}(\eta) = \frac{\exp(\eta)}{1 + \exp(\eta)},
+$$
+
+which yields values $f(\eta) \in [0, 1]$ for any real value $\eta$. As a result,
+we could write down the model of $\psi$ as
+
+$$
+\psi = \frac{\exp(\theta_p + \xi_i)}{1 + \exp(\theta_p + \xi_i)},
+$$
+
+which is known as the Rasch or 1PL model [@bond2013]. Under the above model,
+we can interprete $\theta_p$ as the ability of person $p$ in the sense that
+higher values of $\theta_p$ imply higher success probabilities regardless of the
+administered item. Further, we can interprete $\xi_i$ as the easiness of item
+$i$ as higher values of $\xi_i$ imply higher success probabilities regardless of
+the person to which the item is administered. Note that most definitions of the
+Rasch model rather use $\theta_p - \xi_i$, in which case $\xi_i$ becomes the
+item difficulty instead of the easiness. Clearly, both formulations are
+equivalent. In the present paper we generally use the easiness formulation as it
+naturally fits into the regression framework of \pkg{brms}.
+
+In the context of IRT, GLMs already will carry us a long way, but at some point,
+their flexibility comes to a limit. A typical example of such a situation is
+when we stop assuming discriminations to be constant across items; an assumption
+that will often be violated in real world data [@andrich2004]. Instead, if we
+want to model varying item discrimations $\alpha_i$, the predictor term becomes
+
+$$
+\psi = f(\alpha_i (\theta_p + \xi_i)) = f(\alpha_i \theta_p + \alpha_i \xi_i).
+$$
+
+The argument to $f$ no longer forms a linear predictor as we now consider
+*products* of parameters. In the context of logistic model for dichotomous
+responses, we would refer to the varying discrimination model as 2PL model
+[e.g., @andrich2004]. If persons have a non-zero probability $\gamma_i$ of
+guessing the right answer of item $i$, independent of their abilities, this
+would yield the 3PL model, in our notation written as
+
+$$
+\psi = f(\theta_{p}, \xi_{i}, \alpha_i, \gamma_i) = 
+\gamma_i + (1 - \gamma_i) \, g(\alpha_i (\theta_p + \xi_i))
+$$
+
+with $g$ being some function to transform real values onto the unit interval
+(e.g., the logisitic function). The complexity of such a non-linear predictor
+may be arbitraily increased in theory, but of course needs to be carefully
+specified in order to yield an identifiable and interpretable model. Further,
+In the context of Bayesian IRT, prior distribution may additionally help to identify
+the model (see Section \ref{priors} for more details on priors).
+
+## Item and Person Covariates
+
+A lot of research questions in the context of IRT do not simply require 
+estimating person and item parameters but rather estimating the effects of
+person or item *covariates* [@deboeck2011], that is variables that vary across persons
+and/or items. @deboeck2011 differentiate covariates by their mode (person,
+item, or both) and the origin of the covariate as either internal (stems from
+item responses) or external (independent of the item responses). For instance,
+persons' age would be considered an external person covariate as it varies over
+persons but not over items and does not change its value according to item
+responses. Item type (e.g., figural, numeric, or verbal in case of typical
+intelligence test items) would be considered an external item covariate, while
+the number of previous items solved by a specific person at the time of
+administering a specific item would be an internal person by item covariate.
+
+Regardless of the specific nature of the covariates, we may add them to
+the any linear predictor term $\eta$ in the model so that it no
+longer only depends on individual person and item parameters, but
+also on a set of $J$ covariates $x_j$:
+
+$$
+\eta_{pi} = \theta_p + \xi_i + \sum_{j=1}^J b_j x_{jpi}
+$$
+
+In the above equation, $x_{jpi}$ is the value of the $j$th predictor for person
+$p$ and item $i$. Of course, a person covariate is constant across items and an
+item covariate is constant across persons. We still 
+index all covariates by both person and items, though, to shorten
+the notation without loss of generality.
+
+A further differentiation of covariates may be made by considering over what
+mode (person, items, or both) the covariate effects are allowed to vary (i.e.,
+interact with) in the model. For example, a persons' age varies between but not
+within persons, which implies that the *effect* of age may only vary across
+items. Conversely, the effect of an item covariate may only vary across persons
+as it is constant within each item. Extending the above notation for
+covariates, the regression coefficients $b_j$ would then recieve additional indices
+$p$ or $i$ (i.e., $b_{jp}$ or $b_{ji}$) depending on whether the effect
+of the covariate is expected to vary over person or items.
+ 
+For psychometric tests, it is essential to investigate differential item
+functioning [DIF; @holland2012]. Items showing DIF have different properties for
+persons belonging to different groups even if the persons have the same ability.
+Such items are problematic for the vality of the test as they hinder
+measurement equivalence and may lead to bias in the latent trait estimates
+[@millsap1993; @holland2012]. In turns out that DIF analysis can be performed by
+including and anlyzing specific person-by-item covariates. A detailed discussion
+about this approach is provided in @deboeck2011.
+
+Depending on the nature of the covariates and over which mode their effects are
+assumed to vary, the full model may not be identified or at least hard to
+estimate and interprete. Thus, careful specification of covariates is critical
+to obtain sensible results. @deboeck2011 provide a thoughtful and thorough
+discussion of the use covariates in IRT models and we do not want to reiterate
+every detail, but simply note that all kinds of covariate models discussed in
+their paper may be specified in the here presented framework using the same
+formula syntax.
+
+
+## Prior distributions of person and item parameters {#priors}
+
+In Bayesian statistics, we are interested in the posterior distribution
+$p(\theta, \xi | y)$ of the person and item parameters given the
+data\footnote{In IRT covariate models, the posterior distribution also includes
+the covariates' coefficients and all hyperparameters, but we keep this implicit
+in the equations to simplify the notation.}. 
+The posterior distribution is computed as
+
+$$
+p(\theta, \xi | y) = \frac{p(y | \theta, \xi) \, p(\theta, \xi)}{p(y)}.
+$$
+
+In the above equation $p(y | \theta, \xi)$ is the likelihood, $p(\theta, \xi)$
+is the prior distribution and $p(y)$ is the marginal likelihood. The likelihood
+$p(y | \theta, \xi)$ is the distribution of the data given the parameters and
+thus relates the the data to the parameters. It is nothing else than the
+combination of response distribution and predictor terms discussed above. The
+prior distribution $p(\theta, \xi)$ describes the uncertainty in the person and
+item parameters before having seen the data. It thus allows to explicitely
+incorporate prior knowledge into the model. In practice, we will factorize the
+joint prior $p(\theta, \xi)$ into the product of $p(\theta)$ and $p(\xi)$ so
+that we can specify priors on person and items parameters, independently. The
+marginal likelihood $p(y)$ serves as a normalizing constant so that the
+posterior is an actual probability distribution. Except in the context of
+specific methods (i.e., Bayes factors), $p(y)$ is rarely of direct interest.
+
+In frequentist statistics, parameter estimates are usually obtained by finding
+those parameter values that maximise the likelihood. In contrast, Bayesian
+statistics estimate the full (joint) posterior distribution of the parameters.
+This is not only fully consistent with probability theory, but also much more
+informative than a single point estimate (and an approximate measure of
+uncertainty commonly known as 'standard error'). Obtaining the posterior
+distribution analytically is rarely possible and thus Bayesian statistics relies
+on Markov-Chain Monte-Carlo (MCMC) methods to obtain samples (i.e., random
+values) from the posterior distribution. Such sampling algorithms are
+computationally very intensive and thus fitting models using full Bayesian inference
+is usually much slower than in point estimation techniques. However, advantages of
+Bayesian inference -- such as greater modeling flexibility, prior distributions,
+and more informative results -- are often worth the increased computational cost
+[@gelman2014].
+ 
+In the following, we will explain important aspects in choosing priors for
+person parameters, although the same ideas apply to item parameters, as well. A
+key decision when setting up an IRT model is whether we want
+person parameter (and/or items parameters) to share a common hierarchical prior
+or if we want to specify independent priors on each parameter. In the latter
+case, we would choose a prior and then fix its hyperparameters according to our
+understanding of the scale and prior knowledge about the parameter(s) to be
+estimated [@gelman2014]. To make a concrete example, we can assume a normal
+distribution with mean $0$ and standard deviation $3$ for the person parameters
+of a Rasch model:
+
+$$
+\theta_p \sim \text{Normal}(0, 3)
+$$
+
+By definition of the normal distribution, we thus assume a-priori, that with
+$68\%$ probability person parameters lie within $[-3, 3]$ and that with $97.5\%$
+probability person parameters lie within $[-6, 6]$ on the logit scale. Given the
+scale of the logistic response function, this prior can be considered weakly
+informative. That is, it restricts the parameters to a resonable range of values
+without strongly influecing the obtained posterior distribution. Of course, we
+don't need to restrict ourself to normal distributions. Other prior
+distributions, such as a student-t distribution are possible as well, although
+assuming a normal distribution is arguably the most common choice.
+
+A fundamentally different class of priors arises when assuming the
+person parameters to have the same underlying prior distribution with shared
+hyperparameters. In this, we most commonly use a centered normal distribution so
+that
+
+$$
+\theta_p \sim \text{Normal}(0, \sigma_\theta)
+$$
+
+for all $\theta_p$, which common standard deviation $\sigma_\theta$, which is
+estimated as part of the model. Such a prior implies that parameters are
+shrunken somewhat towards their joint mean, a phenomenon also known as *partial
+pooling* [@gelmanMLM2006]. Partial pooling makes parameter estimates more robust
+as well as less influenced by extreme patterns and noise in the data
+[@gelmanMLM2006]. In the same way as for persons parameters, we may also
+partially pool item parameters so that
+
+$$
+\xi_i \sim \text{Normal}(0, \sigma_\xi)
+$$
+
+for all $\xi_i$, which now share a common standard deviation $\sigma_\xi$. It is
+common in IRT to partially pool person parameters [@deboeck2011] and we
+will follow this approach throughout this paper although a no pooling approach
+could be adopted in \pkg{brms} as well. If we decide to partially pool both
+person and item parameters, we have to slightly amend the model by adding an
+overall intercept parameter $b_0$ to the linear predictor, which then becomes
+$b_0 + \theta_p + \xi_i$. We do this in order to catch average deviations from
+zero, which would otherwise no longer be appropriately modeled as both person
+and item parameters had been (soft) centered around zero. Such a formulation of
+IRT models via partially pooled person and/or item parameters moves them into
+the framework of *generalized linear multilevel models* (GLMMs) and allows
+corresponding GLMM software to fit certain kinds of IRT models [@deboeck2011].
+
+The above model formulation implies that person parameters estimated on different
+distributional parameters are assumed independent of each other, which turns
+out to be a too restrictive assumptions in many applications. Or, at least,
+we do not know a-priori if they are dependent and so it appears to be safer
+to allow for possible dependence regardless. Statistically, correlated
+person parameters are modeled via a hierarchcial multivariate normal distribution
+of the form
+
+$$
+(\theta_{1p}, \ldots, \theta_{Kp}) \sim \text{Multinormal}(0, \mathbf{\Sigma_\theta})
+$$
+
+where $\theta_{kp}$ is the person parameter of person $p$ used in the
+prediction of the distributional parameter $\psi_k$ and $\mathbf{\Sigma_\theta}$ 
+is the covariance matrix determining both the scale and the dependence structure
+of the person parameters. A covariance matrix tends to be relatively hard to
+interprete and so it is usually advantagoues to decompose it into a correlation
+matrix capturing the dependence structure and a vector of standard deviations
+capturing the scales of the person parameters:
+
+$$
+\mathbf{\Sigma_\theta} = \mathbf{D}(\sigma_{\theta 1}, \ldots, \sigma_{\theta K}) \, \mathbf{\Omega_\theta} \, \mathbf{D}(\sigma_{\theta 1}, \ldots, \sigma_{\theta K})
+$$
+
+In the above equation, $\mathbf{\Omega_\theta}$ denotes the correlation matrix
+and $\mathbf{D}(\sigma_{\theta 1}, \ldots, \sigma_{\theta K})$ denotes
+the diagonal matrix with standard deviations $\sigma_{\theta K}$ on the 
+diagonal.  Of course, the same argument goes for item parameters estimated on different distributional parameters so that we may want to model
+
+$$
+(\xi_{1p}, \ldots, \xi_{Kp}) \sim \text{Multinormal}(0, \mathbf{\Sigma_\xi})
+$$
+
+and then decompose $\mathbf{\Sigma_\xi}$ into a correlation matrix 
+$\mathbf{\Omega_\xi}$ and a vector of standard deviations
+$(\sigma_{\xi 1}, \ldots, \sigma_{\xi K})$ analogously to $\mathbf{\Sigma_\theta}$.
+
+What remains to be specified are priors on the hyperparameters that is on the
+standard deviations and correlation matrices. In short, for standard deviation,
+we recommend priors whose denisities have a mode at zero and fall off strictily
+monotonically for increasing parameter values. Examples for such priors are
+half-normal or half-cauchy priors. For correlation matrices, we recommend the
+LKJ prior [@lewandowski2009], which can be chosen as uniform over the space of
+valid correlation matrices. More details on hyperparameters in \pkg{brms} and
+\pkg{Stan} are provided in @brms1, @brms2, and @stanM2019.
+
+Lastly, we want to discuss priors on covariate effects. A special complexity in
+that context is that the scale of the coefficients depends not only on the
+(link-transformed) scale of the response variable but also on the scale of the
+covariates themselves (and possibly also on the dependency between covariates).
+Additionally, the choice of priors depends on the goal we want to achieve by
+their means, for instance, improving convergence, penalizing unrealisticly large
+values, or covariate selection [see also @gelman2017]. \pkg{brms} supports
+several covariate priors, ranging from completely flat "uninformative" priors
+(the current default), over weakly-informative priors for mild regularization
+and improving convergence to dedicated priors for variable selection such as the
+horseshoe prior [@carvalho2010; @piironen2017]. Setting priors in general is an
+active area of research and we hope to further improve our understanding of and
+recommendations for priors in the future.
+
+
+# Model specification in brms {#brms}
+
+In \pkg{brms}, specifying a GLMM of person and item parameters is done mainly via three arguments: `family`, `formula`, and `prior`. We will explain each of 
+them in detail in the following. 
+
+## Specifying the family argument {#family-prior}
+
+The model `family` specifies the response distribution as well as the response
+functions of the predicted distributional parameters. Following the convention
+of GLM theory, we do not specify the response function directly but rather its
+inverse, which is called the link function\footnote{In our opinion, the
+convention of specifying link functions instead of response functions is
+unfortunate. We think it is more natural to transform linear predictors to the
+scale of the parameter via the response function, rather than transforming the
+parameter to the scale of the linear predictor.}.
+In \pkg{brms}, each response distribution has a dedicated primary parameter
+$\psi_1 = \mu$ that usually describes the mean of the distribution or some other
+measure of central tendency. This primary parameter is accompanied by a
+corresponding link function, which, as explained above, ensures that $\mu$ is on
+the scale expected by the distribution. In the \pkg{brms} framework, a `family`
+can be specified via
+
+```{r, eval = FALSE}
+family = brmsfamily(family = "<family>", link = "<link>")
+```
+
+where `<family>` and `<link>` have to be replaced the the names of 
+the desired response distribution and link function of $\mu$, respectively.
+For binary responses, we could naturally assume a Bernoulli distribution
+and a `logit` function, which would then be passed to \pkg{brms} via
+
+```{r, eval = FALSE}
+family = brmsfamily(family = "bernoulli", link = "logit")
+```
+
+The Bernoulli distribution has no additional parameters other than $\mu$, but
+most other distributions do. Take, for instance, the normal distribution, which
+has two parameters, the mean $\mu$ and the residual standard deviation $\sigma$.
+The former can take on all real values and as such using the identity link
+(i.e., no transformation at all) is a viable solution. If we assumed $\sigma$ to
+be constant across observations, we would simply specify
+
+```{r, eval = FALSE}
+family = brmsfamily(family = "gaussian", link = "identity")
+```
+
+If, however, we also modeled $\sigma$ as depending on item and/or person
+parameters, we need to think of a link function for $\sigma$ as well. This is
+because $\sigma$ is a standard deviation, which, by definition, can only take on
+positive values. A natural choice to restrict predictions to be positive is the
+log link function with corresponding exponential response function. To make this
+explicit, we write
+
+```{r, eval = FALSE}
+family = brmsfamily(family = "gaussian", link = "identity",
+                    link_sigma = "log")
+```
+
+An overview of available families in \pkg{brms} together with their
+distributional parameters and supported link functions is provided in
+`?brmsfamily`. Details about the parameterization of each family are given in
+\code{vignette("brms\_families")}. If the desired response distribution is not
+available as a built-in family, users may specify their own custom families for
+use in \pkg{brms}. Details on custom families can be found in
+\code{vignette("brms\_customfamilies")}.
+
+## Specifying the formula argument {#formula-prior}
+
+We will now discuss the `formula` argument of \pkg{brms}. Throughout this paper, we
+will assume the response variable to be named `y` and the person an item
+indicators to be named `person` and `item`, respectively. Of course, these names
+are arbitary and can be freely chosen by the user. If we just predict the main
+parameter $\mu$ of the response distribution (i.e., the mean or some other measure of
+central tendency), we just need a single \proglang{R} formula for the model
+specification. If we want to apply partial pooling to the person parameters
+but not to the item parameters, we would write
+
+```{r, eval = FALSE}
+formula = y ~ 0 + item + (1 | person)
+```
+
+Instead, if we wanted to partially pool both person and item parameters,
+we would write
+
+```{r, eval = FALSE}
+formula = y ~ 1 + (1 | item) + (1 | person)
+```
+
+Throughout this paper, we will model both person and item parameters via partial
+pooling as we believe it to be the more robust approach, which also scales
+better to more complex models [@gelmanMLM2006]. If, for some reason, partial
+pooling of items is not desired, the expression `1 + (1 | item)` has to be
+replaced by `0 + item`.
+
+In standard \proglang{R} formula syntax, from which \pkg{brms} formula syntax
+inherits, covariates may be included in the model by adding their names to
+the formula. For instance, if we wanted to model an overall
+effect of a covariate `x`, we would write 
+
+```{r, eval=FALSE}
+y ~ 1 + x + (1 | item) + (1 | person)
+``` 
+
+Additionally, if we wanted the effect of `x` to vary over items, we would write 
+
+```{r, eval=FALSE} 
+y ~ 1 + x + (1 + x | item) + (1 | person)
+```
+
+Modeling covariate effects as varying over persons can be done analogously.
+Interactions are specified via the `:` operator. That is, for covariates `x1`
+and `x2` we add `x1:x2` to the formula in order to model their interaction. We
+may also use `x1*x2` as a convenient short form for `x1 + x2 + x1:x2`. As the
+data is expected to be in long format, the syntax for covariate effects is
+independent on the mode of the covariate.
+
+In most basic IRT models, only the mean of the response distribution is
+predicted while other distributional parameters, such as the residual standard
+deviation of a normal distribution, are assumed constant across all
+observations. Depending on the psychometric test, this may be a too restrictive
+assumption as items and persons not only differ in the mean response but also in
+other aspects, which are captured by additional parameters. To predict, multiple
+distributional parameters in \pkg{brms}, we need to specify one formula per
+parameter as follows:
+
+```{r, eval = FALSE}
+formula = bf(
+  y ~ 1 + (1 | item) + (1 | person),
+  par2 ~ 1 + (1 | item) + (1 | person),
+  par3 ~ 1 + (1 | item) + (1 | person),
+  ...
+)
+```
+
+The function `bf` is a shortform for `brmsformula`, which helps setting up
+complex models in \pkg{brms}. In the above specification, `par2` and `par3` are
+placeholders for the parameter names, which are specific to each response
+distribution. Covariates effects on such parameters may be included in the 
+same way as before.
+
+The model formulation shown above implies person and item parameters,
+respectively, of different distributional parameters to be independent of each
+other. However, we would generally prefer to also model correlations between
+them to improve partial pooling across the whole model (see Section \ref{priors}
+for details). The solution implemented in \pkg{brms} (and currently unique to
+it) is to expand the \code{|} operator into \code{|<ID>|}, where \code{<ID>} can
+be any value. Person or item parameters with the same \code{ID} will then be
+modeled as correlated even though they appear in different \proglang{R}
+formulas. That is, if we want to model both person and item parameters as
+correlated across all distributional parameters, we choose some arbitray IDs,
+for instance `p` for person and `i` for item, and write
+
+```{r, eval = FALSE}
+formula = bf(
+  y ~ 1 + (1 |i| item) + (1 |p| person),
+  par2 ~ 1 + (1 |i| item) + (1 |p| person),
+  par3 ~ 1 + (1 |i| item) + (1 |p| person),
+  ...
+)
+```
+
+As discussed above, standard \proglang{R} formula syntax is designed to create
+additive predictors by splitting up the right-hand side of the `formula` in its
+unique terms separated from each other by `+` signs. This formulation is
+convenient and flexibile but it cannot be used to express non-linear predictors
+of arbitrary complexity. To achieve the latter, \pkg{brms} also features a
+second, more expressive way to parse \proglang{R} formulas. Suppose that the
+response `y` is related to some covariate `x` via a  non-linear function `fun`.
+Further, suppose that the form of `fun` is determined by two parameters `nlpar1`
+and `nlpar2` which we need to estimate as part of the model fitting process. We
+well call them *non-linear parameters* to refer to the fact that they are
+parameters of a non-linear function. To complicate things, `nlpar1` and `nlpar2`
+are not necessarily constant across observations, but rather vary across persons
+and item. That is, we need to specify a main non-linear formula as well as some
+additional linear formulas describing how the non-linear parameters should
+predicted. Basically, non-linear parameters are handled in the same way as
+distributional parameters. Suppose that `nlpar1` depends on both persons and
+items, while `nlpar2` just depends on the items. In \pkg{brms}, we can express
+this as
+
+```{r, eval = FALSE}
+formula = bf(
+  y ~ fun(x, nlpar1, nlpar2),
+  nlpar1 ~ 1 + (1 | item) + (1 | person),
+  nlpar2 ~ 1 + (1 | item),
+  nl = TRUE
+)
+```
+
+Using `nl = TRUE` is essential as it ensures that the right-hand side of the
+formula is taken literally instead of being parse via standard \proglang{R}
+formula syntax. Of course, we are not limited to one covariate and two
+non-linear parameters, but instead can specify any number of them in the formula.
+Further, the linear predictors of the non-linear parameters may contain
+all kinds of additive terms that we introduced above for usage with
+distributional parameters. This flexible combination of linear and non-linear
+formulas results in a model flexibility that, to our knowledge, is currently
+unmatched by any regression or IRT framework available in \proglang{R} or
+any other freely available programming language.
+
+## Specifying the prior argument {#brms-prior}
+
+Prior specification is an essential part in the Bayesian workflow and \pkg{brms}
+offers an intuitive and flexible interface for convenient prior specification
+that can be readily applied to IRT models. In the following, we explain the
+syntax to specify priors in the proposed IRT framework. The priors we choose
+as examples below are not ment to imply any practical recommendation for 
+exactly these priors. Rather, the prior can only be understood in the
+context of the model it is part of [@gelman2017]. Accordingly, user-defined priors 
+should always be chosen by keeping the model and relevant subject matter 
+knowledge in mind. We will attempt to provide more ideas in this direction in
+Section \ref{examples}.
+
+The main function for the purpose of prior specification in \pkg{brms} is
+`set_prior`. It takes the prior itself in the form of a character string as well
+as additional arguments to define the parameters on which the prior should
+imposed. If we use partial pooling for item and/or person parameters, the normal
+prior on those parameters it automatically set and cannot be changed via the
+`prior` argument. However, we may change priors on the hyperparameters defining
+the covariance matrix of the person or item parameters that is on the standard
+deviations and correlation matrices. Suppose we want to define a
+$\text{half-Cauchy}(0, 5)$ prior on the standard devation $\sigma_\theta$ of the
+person parameters and an $\text{LKJ}(2)$ prior on their correlation matrix
+$\mathbf{\Omega_\theta}$ across the whole model, then we write
+
+```{r, eval = FALSE}
+prior = set_prior("cauchy(0, 5)", class = "sd", group = "person") +
+  set_prior("lkj(2)", class = "cor", group = "person")
+```
+
+These priors will then apply to all distributional and non-linear parameters which
+vary across persons. As shown above, multiple priors may be combined
+via the `+` sign. Alternatively, `c()` or `rbind()` may be used to combine
+priors too. In \proglang{Stan}, and therefore also in \pkg{brms}, truncated
+priors such as the half-Cauchy prior are implictely specified by imposing
+a hard boundary on the parameter, that is a lower boundary of zero for 
+standard deviations, and then using the non-truncated version of the prior.
+Setting the hard boundary is done internally and so `"cauchy(...)"` will
+actually imply a half-Cauchy prior when used for a standard deviation parameter.
+
+We can make priors specific to certain distributional parameters by means of the
+`dpar` argument. For instance, if we want a $\text{Gamma}(1, 1)$ prior on the
+person standard deviation of `dpar2` we write
+
+```{r, eval = FALSE}
+prior = set_prior("gamma(1, 1)", class = "sd", group = "person", 
+                  dpar = "dpar2")
+```
+
+Analogously to distributional parameters, priors can be applied specifically
+to certain non-linear parameters by means of the `nlpar` argument.
+
+If, for some reasons, one chooses to *not* use partial pooling for the 
+item parameters via formulas like `y ~ 0 + item + (1 | person)`,
+item parameters will be treated as ordinary regression coeffiecients and
+so their prior specification changes too. In this case, we cannot only set
+priors on all item parameters at once, but may also on specific items if desired.
+In \pkg{brms}, the class referring to regression coefficients if called `"b"`.
+That is, we can impose a $\text{Normal}(0, 3)$ prior on all item parameters via
+
+```{r, eval = FALSE}
+prior = set_prior("normal(0, 3)", class = "b")
+```
+
+We may additionally set priors on the specific items. If, say, we know that
+`item1` will be relatively easy to answer correctly, we may encode this via a
+prior that has a mean greater than zero\footnote{Rememember that \pkg{brms} uses
+the easiness formulation so that larger values mean higher probability of
+solving an item.}. This could then look as follows:
+
+```{r, eval = FALSE}
+prior = set_prior("normal(0, 3)", class = "b") +
+  set_prior("normal(2, 3)", class = "b", coef = "item1")
+```
+
+Internally, \pkg{brms} will always search for the most specific prior provided
+by the user. If no user specified prior can be found, default priors will apply
+which are set to be very wide and can thus be considered non or weakly informative.
+Priors on the covariates can be specified in the same way as priors on
+non-hierarchical item parameters, that is via class \code{"b"}. 
+
+# Parameter estimation and post-processing {#estimation}
+
+The \pkg{brms} package uses \pkg{Stan} [@carpenter2017] on the back-end for the
+model estimation. Accordingly, all samplers implemented in \pkg{Stan} can be
+used to fit \pkg{brms} models. The flagship algorithm of Stan is an adaptive
+Hamiltonian Monte-Carlo (HMC) sampler
+[@betancourt2014;@betancourt2017;@stanM2019], which progressed from the
+No-U-Turn Sampler (NUTS) by @hoffman2014. HMC-like algorithms produce posterior
+samples that are much less autocorrelated than those of other samplers such as
+the random-walk Metropolis algorithm [@hoffman2014; @creutz1988]. What is more,
+consequtive samples may even be anti-correlated leading to higher efficiency
+than completely independent samples [@gelman2014]. The main drawback of this
+increased efficiency is the need to calculate the gradient of the log-posterior,
+which can be automated using algorithmic differentiation [@griewank2008] but is
+still a time-consuming process for more complex models. Thus, using HMC leads to
 higher quality samples but takes more time per sample than other algorithms
 typically applied. Another drawback of HMC is the need to pre-specify at least
 two parameters, which are both critical for the performance of HMC. The adaptive
 HMC Sampler of Stan allows setting these parameters automatically thus
 eliminating the need for any hand-tuning, while still being at least as
-efficient as a well tuned HMC \citep{hoffman2014}. For more details on the
-sampling algorithms applied in \pkg{Stan}, see the \pkg{Stan} user's manual
-\citep{stanM2019} as well as \cite{hoffman2014}.
+efficient as a well tuned HMC [@hoffman2014]. For more details on the sampling
+algorithms applied in \pkg{Stan}, see the \pkg{Stan} user's manual [@stanM2019]
+as well as @hoffman2014.
 
 After the estimation of the parameters' joint posterior distribution, \pkg{brms}
 offers a wide range of post-processing options of which several are helpful in
@@ -97,11 +907,1532 @@ this is realized via bridgesampling [@meng1996; @meng2002] as implemented in the
 posterior model probabilities based on prior model probabilities and marginal
 likelihood estimates.
 
-# Binary Models
+# Examples {#examples}
 
-# Ordinal Models
+In this section, we are going to discuss several examples of advanced IRT
+models that can be fitted with \pkg{brms}. We will focus on three common model
+classes: binary, ordinal, and reaction time models, but the discussed principles
+also apply to other types of responses that can be analyzed by means of IRT.
 
-# Response Times Models
+## Binary Models {#binary}
+
+To illustrate the application of \pkg{brms} to binary IRT models, we will
+use the \code{VerbAgg} data set [@deboeck2004], which is included in the 
+\pkg{lme4} package [@lme4]. 
+
+```{r}
+data("VerbAgg", package = "lme4")
+```
+
+This data set contains responses of 316 participants on 24 items of a
+questionnaire on verbal aggression. Several item and person covariates are
+provided. A glimpse of the data is given in Table \ref{tab:head-VerbAgg}
+and more details can be found by typing \code{?lme4::VerbAgg}.
+
+```{r head-VerbAgg, echo=FALSE}
+head(VerbAgg, 10) %>%
+	kable(
+    caption = "First ten rows of the \\texttt{VerbAgg} data.",
+    booktabs = TRUE,
+    escape = FALSE
+	)
+```
+
+We start by computing a simple 1PL model. For reasons discussed in Section
+\ref{model}, we partially pool person and item parameters by specifying the
+model as
+
+```{r}
+formula_va_1pl <- bf(r2 ~ 1 + (1 | item) + (1 | id))
+```
+
+To regularize the model a bit, we impose $\text{half-Normal}(0, 3)$
+priors on the hierarchical standard deviations of person and items parameters.
+Given the scale of the logistic response function, this can regarded as
+a weakly informative prior.
+
+```{r}
+prior_va_1pl <- 
+  prior("normal(0, 3)", class = "sd", group = "id") + 
+  prior("normal(0, 3)", class = "sd", group = "item")
+```
+
+The model is then fit as follows:
+
+```{r, include=FALSE}
+fit_va_1pl <- brm(
+  formula = formula_va_1pl,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_1pl"
+)
+fit_va_1pl <- add_loo(fit_va_1pl)
+```
+
+```{r, eval=FALSE}
+fit_va_1pl <- brm(
+  formula = formula_va_1pl,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl
+)
+```
+
+To get a quick overview of the model results and convergence, we summarize
+the main parameters nummerically using the `summary` method:
+
+```{r}
+summary(fit_va_1pl)
+```
+
+A graphical summary of the marginal posterior densities as well as the MCMC
+chains is obtained via 
+
+```{r plot-va-1pl, fig.width=8, fig.cap="Summary of the posterior distribution of selected parameters obtained by model \\code{fit\\_va\\_1pl.}"}
+plot(fit_va_1pl)
+```
+
+and shown in Figure \ref{fig:plot-va-1pl}. Before interpreting the results
+it is crucial to investigate whether the model fitting algortihm converged to
+its target, that is the parameters' posterior distribution for fully Bayesian
+models. There a multiple ways to investigate convergence. We could do it
+graphically for instance by looking at trace plots (see the right-hand side of
+Figure \ref{fig:plot-va-1pl}) or more recently proposed rank plots
+[@vehtari2019]. On that basis, we interprete MCMC chains as having converged to
+the same target distribution, if the chains are mixing well individually (i.e.,
+quickly jumping up and down) and are overlaying each other at the same time
+[@gelman2014]. We may also investigate convergence numerically by mean of the
+scale reduction factor $\widehat{R}$ [@gelman1992; @gelman2014; @vehtari2019],
+which should be close to one (i.e., $\widehat{R} < 1.01$), and the effective
+sample size, which should be as large as possible but at least 400 to merely
+ensure reliable convergence diagnostics [@vehtari2019]. The corresponding
+columns in the summary output are called \code{Rhat} and \code{Eff.Sample}.
+Convergence diagnostics for all model parameters can be obtained via the
+\code{rhat} and \code{neff_ratio} methods, respectively. Additionally, there are
+some diagnostics specific to (adaptive) HMC, which we can access using
+\code{nuts_params} and plotted via various options in \code{stanplot}. After
+investigating both the graphical and numerical indicators of convergence, we are
+confident that the model fitting algorithm succeeded so that we can start
+interpreting the results.
+
+We see from the summary of the standard deviation parameters (named
+`sd(intercept)` in the output) that both persons and items vary substantially.
+Not all model parameters are shown in `summary` and `plot` to keep the output
+clean and readable and so we need to call other methods depending on what we are
+interested in. In IRT, this most likely include the person and item parameters,
+which we can access via methods `coef` and `ranef` depending on whether or not
+we want to include overall effects (i.e., the global intercept for the present 
+model) in the computation of the individual coefficients. We display item and
+person parameters in Figure \ref{fig:coef-item-va-1pl} and
+\ref{fig:coef-person-va-1pl}, respectively.
+
+```{r coef-item-va-1pl, echo=FALSE, fig.width=8, fig.cap = "Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_1pl}."}
+coef_fit_va_1pl <- coef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
+coef_fit_va_1pl$item[, , "Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column() %>%
+	select(-Est.Error) %>%
+	rename(item = "rowname") %>%
+	mutate(item = as.numeric(item)) %>%
+	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	geom_pointrange() +
+	coord_flip() +
+	labs(x = "Item Number")
+```
+
+```{r coef-person-va-1pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_1pl}."}
+ranef_fit_va_1pl <- ranef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_fit_va_1pl$id[, , "Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column() %>%
+	select(-Est.Error) %>%
+	arrange(Estimate) %>%
+	mutate(id = seq_len(n())) %>%
+	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	geom_pointrange(alpha = 0.7) +
+	coord_flip() +
+	labs(x = "Person Number (Sorted)")
+```
+
+From Figure
+\ref{fig:coef-item-va-1pl} it is clear that some items (e.g., the 4th item) are
+endorsed by a lot of persons and thus have strongly positive easieness
+parameters, while other items (e.g., the 21th item) are mostly rejected and thus
+have a strongly negative easiness parameter.
+From Figure \ref{fig:coef-person-va-1pl} we see that the person parameters vary
+a lot but otherwise show a regular pattern of blocks of persons getting very
+similar estimates. The latter is because, in the 1PL model, all items are
+assumed to have the same discrimination and are thus weighted equally. As a
+result, two persons endorsing the same number of items in total will receive the
+same estimate, regardless of which items they endorsed exactly. This assumption
+of equal discriminations is very restrictive and we will now investigate it in
+more detail. In a 2PL model, we would assume each item to have its own
+disrcimintation, which are to be estimated from the model along with all other
+parameters. Recall that mathematically, the 2PL model looks as follows:
+
+$$
+P(y = 1) = \mu = \text{logistic}(\alpha_i (\theta_p + \xi_i))
+$$
+
+Without any further restrictions, this model will likely not be identified
+(unless we were specifiying highly informative priors) because a switch in the
+sign of $\alpha_i$ can be corrected for by a switch in the sign of $\theta_p +
+\xi_i$ without a change in the overall likelihood. For this reason, we assume
+$\alpha_i$ to be positive for all items, a sensible assumption for the
+\code{VerbAgg} data set where a $y = 1$ always implies endorsing a certain verbally
+aggressive behavior. There are multiple ways to force $\alpha_i$ to be positive,
+one of which is to model it on the log-scale, that is to estimate $\log
+\alpha_i$ and then exponentiating the result to obtain the actual discrimination
+via $\alpha_i = \exp(\log \alpha_i)$.
+
+```{r}
+formula_va_2pl <- bf(
+  r2 ~ exp(logalpha) * eta,
+  eta ~ 1 + (1 |i| item) + (1 | id),
+  logalpha ~ 1 + (1 |i| item),
+  nl = TRUE
+)
+```
+
+Above, we split up the non-linear model into two parts, `eta` and `logalpha`,
+each of which is in turn predicted by a linear formula. The parameter `eta`
+represents the sum of person parameter and item easiness, whereas `logalpha`
+represents the log discrimination. We modeled item easiness and discrimination
+as correlated by using `|i|` in both varying item terms (see Section
+\ref{brms}). We impose weakly informative priors both on the intercepts of
+`eta` and `logalpha` (i.e., on the overall easiness and log discrimination) as
+well as on the standard deviations of person and item parameters.
+
+```{r}
+prior_va_2pl <- 
+  prior("normal(0, 5)", class = "b", nlpar = "eta") +
+  prior("normal(0, 1)", class = "b", nlpar = "logalpha") +
+  prior("normal(0, 3)", class = "sd", group = "id", nlpar = "eta") + 
+  prior("normal(0, 3)", class = "sd", group = "item", nlpar = "eta") +
+  prior("normal(0, 1)", class = "sd", group = "item", nlpar = "logalpha")
+```
+
+Finally, we put everything together and fit the model via
+
+```{r, include = FALSE}
+fit_va_2pl <- brm(
+	formula = formula_va_2pl,
+  data = VerbAgg, 
+	family = brmsfamily("bernoulli", "logit"),
+	prior = prior_va_2pl,
+	inits = 0,
+	file = "models/fit_va_2pl"
+)
+fit_va_2pl <- add_loo(fit_va_2pl)
+```
+
+```{r, eval = FALSE}
+fit_va_2pl <- brm(
+  formula = formula_va_2pl,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_2pl,
+)
+```
+
+The results of `summary` and `plot` indicate good convergence of the model and
+we don't show their outputs for reasons of brevity. Instead, we directly take a
+look at the item parameters in Figure \ref{fig:coef-item-va-2pl}. The
+discrimination estimates displayed on the right-hand have some considerable
+uncertainty, roughly between 0.3 and 1.2, but are overall very similar
+across items with posterior mean estimates of about 0.5. The easiness parameters
+displayed on the left-hand side still show a similar pattern as in the 1PL
+although their estimates are now more uncertain and spread out as a result of
+also estimating the discriminations.
+
+```{r coef-item-va-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap="Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_2pl}."}
+coef_fit_va_2pl <- coef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
+eta <- coef_fit_va_2pl$item[, , "eta_Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column()
+alpha <- coef_fit_va_2pl$item[, , "logalpha_Intercept"] %>%
+	exp() %>%
+	as_tibble() %>%
+	rownames_to_column()
+bind_rows(eta, alpha, .id = "nlpar") %>%
+	select(-Est.Error) %>%
+	rename(item = "rowname") %>%
+	mutate(item = as.numeric(item)) %>%
+	mutate(nlpar = factor(nlpar, labels = c("Easiness", "Discrimination"))) %>%
+	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	facet_wrap("nlpar", scales = "free_x") +
+	geom_pointrange() +
+	coord_flip() +
+	labs(x = "Item Number")
+```
+
+```{r coef-person-va-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_2pl}."}
+ranef_fit_va_2pl <- ranef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_fit_va_2pl$id[, , "eta_Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column() %>%
+	select(-Est.Error) %>%
+	arrange(Estimate) %>%
+	mutate(id = seq_len(n())) %>%
+	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	geom_pointrange(alpha = 0.7) +
+	coord_flip() +
+	labs(x = "Person Number (Sorted)")
+```
+
+```{r, include=FALSE}
+# model with constant but estimated discrimination
+formula_va_1pl_alpha <- bf(
+	r2 ~ exp(logalpha) * eta,
+	eta ~ 1 + (1 | item) + (1 | id),
+	logalpha ~ 1,
+	nl = TRUE
+)
+
+prior_va_1pl_alpha <- 
+	prior("normal(0, 5)", class = "b", nlpar = "eta") +
+	prior("normal(0, 1)", class = "b", nlpar = "logalpha") +
+	prior("normal(0, 3)", class = "sd", group = "id", nlpar = "eta") + 
+	prior("normal(0, 3)", class = "sd", group = "item", nlpar = "eta")
+
+fit_va_1pl_alpha <- brm(
+	formula = formula_va_1pl_alpha,
+  data = VerbAgg, 
+	family = brmsfamily("bernoulli", "logit"),
+	prior = prior_va_1pl_alpha,
+	inits = 0,
+	file = "models/fit_va_1pl_alpha"
+)
+fit_va_1pl_alpha <- add_loo(fit_va_1pl_alpha)
+```
+
+```{r, include=FALSE}
+cor_1pl_2pl <- cor(
+	ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
+	ranef_fit_va_2pl$id[, "Estimate", "eta_Intercept"]
+)
+
+loo_1pl_2pl <- loo_compare(loo(fit_va_1pl), loo(fit_va_2pl))
+loo_1pl_alpha <- loo_compare(loo(fit_va_1pl), loo(fit_va_1pl_alpha))
+```
+
+The correlation between person parameters obtained by the two models turns out
+to be $r =$ `r round(cor_1pl_2pl, 3)`, so there is basically nothing gained from
+the 2PL model applied to this particular data set. In line with these results,
+model fit obtained via approximate leave-one-out cross-validation (LOO-CV)
+results in a LOOIC difference of $\Delta \text{LOOIC} =$ 
+`r round(-2 * loo_1pl_2pl["fit_va_1pl", 1], 2)` in favor of the 2PL model, 
+which is very small
+both on an absolute scale and in comparison to its standard error $\text{SE} =$
+`r round(2 * loo_1pl_2pl["fit_va_1pl", 2], 2)` depicting the uncertainty in the
+difference. Similarily, a model inbetween the 1PL and 2PL model, which assumes a
+constant discrimination across items, does not improve model fit noticably
+either ($\Delta \text{LOOIC} =$ `r round(-2 * loo_1pl_alpha["fit_va_1pl", 1], 2)`; 
+$\text{SE} =$ `r round(2 * loo_1pl_alpha["fit_va_1pl", 2], 2)`). For these
+reasons, we will continue to use the 1PL model in our further analysis of the
+data.
+
+### Modeling Covariates
+
+When analysing the \code{VerbAgg} data set, we are not so much interested
+in the item and person parameters themselves, but rather in the
+effects of item and person covariates. We start by including
+only item covariates, in this case the behavior type (`btype`, with
+factor levels `curse`, `scold`, and `shout`), the situation type 
+(`stype`, with factor levels `other` and `self`), as well
+as the behavior mode (`mode`, with factor levels `want` and `do`).
+Additionally, we assume the effect of `mode` to vary over persons,
+that is assume each person to have their own effect of `mode`.
+We specify this model in formula syntax as
+
+```{r, eval=FALSE}
+r2 ~ btype + situ + mode + (1 | item) + (1 + mode | id)
+```
+
+This model assumes a varying intercept (i.e., baseline) and
+a varying effect of `mode` (i.e., difference between `want` and `do`) 
+per person. However, in this example, we are actually more interested in estimating
+varying effects of `want` and `do`, separately, in order to compare
+variation between these two modes. For this purpose, we slightly amend
+the formula, which now becomes 
+
+```{r, eval=FALSE}
+r2 ~ btype + situ + mode + (1 | item) + (0 + mode | id)
+```
+
+The notation `0 + mode` implies that each factor level of `mode` gets
+its own varying effect, instead of modeling the intercept and differences 
+between factor levels. We are now ready to actually fit the model:
+
+```{r, eval = FALSE}
+formula_va_1pl_cov1 <- bf(
+  r2 ~ btype + situ + mode + (1 | item) + (0 + mode | id)
+)
+fit_va_1pl_cov1 <- brm(
+  formula = formula_va_1pl_cov1,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl
+)
+```
+
+```{r, include=FALSE}
+formula_va_1pl_cov1 <- bf(
+	r2 ~ btype + situ + mode + (1 | item) + (0 + mode | id)
+)
+fit_va_1pl_cov1 <- brm(
+  formula = formula_va_1pl_cov1,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_1pl_cov1"
+)
+fit_va_1pl_cov1 <- add_loo(fit_va_1pl_cov1)
+```
+
+As usual, a quick overview of the results can be obtained via
+
+```{r}
+summary(fit_va_1pl_cov1)
+```
+
+```{r, include=FALSE}
+b_do <- round(posterior_summary(fit_va_1pl_cov1, pars = "^b_modedo$"), 2)
+```
+
+From the summary output we see that the behavior difference of the `do` and
+`want` behavior modes has a negative logit regression coefficient ($b =$ 
+`r b_do[, "Estimate"]`, $95\% \; \text{CI} = [$`r b_do[, "Q2.5"]`, 
+`r b_do[, "Q97.5"]`$]$), which implies that, holding other predictors constant, 
+people are more likely to *want* to be verbally agressive than to actually *be*
+verbally agressive. However, although the direction of the effect is quite
+clear, its maginitude tends to be hard to interprete as it the regression
+coefficients are on the logit scale. To ease interpretation, we can transform
+and plot them on the original probability scale (see Figure \ref{fig:me-va-mode}) 
+using a single line of code:
+
+```{r me-va-mode, fig.width=8, fig.height=4, fig.cap="Expected probabilities of agreeing to an item in the VerbAgg data set as a function of the behavior mode conditioned on all other covariates being set to their reference categories."}
+marginal_effects(fit_va_1pl_cov1, "mode")
+```
+
+Further, in the summary output, we see that both modes vary substantially over
+persons, with a little bit more variation in mode `do`. We may ask the question
+how likely it is, that the variation in `do` across persons is actually larger
+than the variation in `want`. Answering such a question in a frequentist
+framework would not be easy as the joint distribution of the two SD parameters
+is unlikely to be (bivariate) normal. In contrast, having obtained samples from
+the joint posterior distribution using MCMC sampling, as we did, computing the
+posterior distribution of the difference becomes a matter of computing the
+difference for which pair of posterior samples. This procedure of transforming
+posterior samples is automated in the `hypothesis` method of \pkg{brms}. For
+this particular question, we need to use it as follows:
+
+```{r, eval = FALSE}
+hyp <- "modedo - modewant > 0"
+hypothesis(fit_va_1pl_cov1, hyp, class = "sd", group = "id")
+```
+
+```{r, echo=FALSE}
+hyp <- "modedo - modewant > 0"
+hyp <- hypothesis(fit_va_1pl_cov1, hyp, class = "sd", group = "id")
+take <- c("Hypothesis", "Estimate", "CI.Lower", "CI.Upper", "Post.Prob")
+hyp$hypothesis <- hyp$hypothesis[, take, drop = FALSE]
+take <- take[-1]
+hyp$hypothesis[, take] <- round(hyp$hypothesis[, take, drop = FALSE], 2)
+print(hyp$hypothesis)
+```
+
+(output shortend for readability; CI denotes $90\%$ the credibly interval). From
+the `Post.Prob` column we see that, given the model and the data, with 
+`r round(hyp$hypothesis$Post.Prob, 2)` probability the SD of the `do` effects is
+higher than the SD of the `want` effects, although the expected SD difference of
+`r round(hyp$hypothesis$Estimate, 2)` (on the logit scale) is rather small.
+
+Similarily to how we incorporate item covariates, we may also add person
+covariates to the model. In the \code{VerbAgg} data, we have information about the
+subjects' trait anger score `Anger` as measured on the Stat Trait Anger
+Expression Inventory [STAXI; @spielberger2010] as well as about their `Gender`. We
+additionally assume `Gender` and `mode` to interact, that is
+allowing the effect of the behavior mode (`do` vs. `want`) to vary with the
+gender of the subjects. Further, we expect the individual item parameters to
+also vary with gender by replacing the term `(1 | item)` by 
+`(0 + Gender | item)`. The complete model formula then looks as follows:
+
+```{r, eval=FALSE}
+r2 ~ Anger + Gender + btype + situ + mode + mode:Gender +
+  (0 + Gender | item) + (0 + mode | id)
+```
+
+```{r, include=FALSE}
+formula_va_1pl_cov2 <- bf(
+	r2 ~ Anger + Gender + btype + situ + mode + mode:Gender +
+	(0 + Gender | item) + (0 + mode | id)
+)
+fit_va_1pl_cov2 <- brm(
+  formula = formula_va_1pl_cov2,
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_1pl_cov2"
+)
+fit_va_1pl_cov2 <- add_loo(fit_va_1pl_cov2)
+```
+
+We fit it the model as usual with the `brm` function. Afterwards, we obtain
+a graphical summary of the effects of the newly added person covariates via
+
+```{r eval=FALSE}
+marginal_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender"))
+```
+
+As can be seen on the left-hand side of Figure \ref{fig:me-va-cov2}, increased
+trait anger is clearly associated with higher probabilities of agreeing to items
+in the \code{VerbAgg} data set. Also, as can be seen on the right-hand side of
+Figure \ref{fig:me-va-cov2}, there is an interaction between behavior mode and
+gender. More specifically, women and men report *wanting* to be verbally
+aggressive by roughly the same probability, while men report actually *being*
+verbally aggressive with a much higher probability than women.
+
+```{r me-va-cov2, echo=FALSE, fig.height=5, fig.width=10, fig.cap="Expected probabilities of agreeing to an item in the VerbAgg data set as a function of the trait anger (left) and the interaction of behavior mode and subjects' gender (right) conditioned on all other categorical covariates being set to their reference categories and numerical covariates being set to their mean."}
+me_va_cov2 <- marginal_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender"))
+me_va_cov2 <- plot(me_va_cov2, plot = FALSE)
+me1 <- me_va_cov2[[1]]
+me2 <- me_va_cov2[[2]]
+me1 + me2
+```
+
+In all of the above described covariate models, there is no particular reasoning
+behind the choice of which item or person covariates are assume to vary over
+persons or items, respectively, and which are assumed to be constant. We may
+also try to model multiple or even all item covariates as varying over persons
+and all person covariates as varying over items. In fact, this maximal
+multilevel approach may be more robust and conservative [@barr2013]. In
+frequentist implementations of multilevel models, we often see convergence 
+issues when using maximal multilevel structure [@bates2015]. 
+This has been interpreted by some as an
+indication of overfitting [@bates2015] while others disagree [@barr2013]. In any
+case, convergence issues seem to be a crude indicator of overfitting that we
+argue should not be blindly relied on. Fortunately, convergence of complex
+multilevel models turns out to be much less of a problem when using gradient
+based MCMC samplers such as HMC [@hoffman2014]. For instance, when fitting a
+maximal multilevel structure of item and person covariates via the formula
+
+```{r, eval=FALSE}
+r2 ~ 1 + Anger + Gender + btype + situ + mode + 
+  (1 + Anger + Gender | item) + (1 + btype + situ + mode  | id)
+```
+
+the \pkg{lme4} package indicates serious convergence issues while the \pkg{brms}
+model converges just fine (results not displayed here, see LINK for details). Of
+course, this is not to say that such a multilevel structure is necessarily
+sensible. However, being able to fit those models allows for more principled
+ways of testing afterwards *if* the assumed complexity is actually supported by
+the data.
+
+```{r, eval = FALSE, include = FALSE}
+# does not converge at all
+glmer_va_1pl_cov_full <- lme4::glmer(
+  r2 ~ 1 + Anger + Gender + btype + situ + mode + 
+	  (1 + Anger + Gender | item) + (1 + btype + situ + mode  | id),
+	data = VerbAgg, family = binomial("logit")
+)
+
+# converges nicely and shows sensible results
+fit_va_1pl_cov_full <- brm(
+  r2 ~ 1 + Anger + Gender + btype + situ + mode + 
+	  (1 + Anger + Gender | item) + (1 + btype + situ + mode  | id),
+  data = VerbAgg, 
+  family = brmsfamily("bernoulli", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_1pl_cov_full"
+)
+```
+
+### Modeling Guessing Parameters
+
+A common aspect of binary item response data in IRT is that persons may be able
+to simply guess the correct answer with a certain non-zero probability. This may
+happen in a forced choice format where the correct answer is presented along
+with a some distractors. As a result, the probability of correctly answering an
+item never falls below the guessing probability, regardless of the person's
+ability. For instance, when assuming all alternatives to be equally attractive
+in the absense of any knowledge about the correct answer, the guessing
+probability is 1 divided by the total number of alternatives. Such a property of
+the administered items needs to be taken into account in the estimated IRT
+model. The most commonly applied model in such a situation is the 3PL
+model\footnote{In addition to guessing probabilities, which increase the lower
+bound of success probability beyond 0, it is also possible that lapses decrease
+the upper bound of the sucess probability below 1. A binary model taking into
+account both guesses and lapses is referred to 4PL model. Arguably 4PL models
+more relevant for instance in psychophycis and less so in IRT. For that reason,
+we do not discuss it in more detail in this paper but want to point out that
+\pkg{brms} could also be used to fit 4PL models.}. Mathematically, the model can
+be expressed as
+
+$$
+P(y = 1) = \mu = \gamma_i + (1 - \gamma_i) \times \text{logistic}(\alpha_i (\theta_p + \xi_i))
+$$
+
+where $\gamma_i$ represents the guessing probability of item $i$ and all
+other parameters have the same meaning as in the 2PL model.
+
+The items of the \code{VerbAgg} data set have no forced choice response format --
+and no right or wrong answers either -- and so modeling guessing probabilities
+makes little sense for that data. For reasons of brevity, we are not going to
+introduce another data set on which we apply 3PL models, but instead only focus
+on showing how to express such a model in \pkg{brms} without actually fitting
+the model.
+
+Suppose we have adminstered forced choice items with 4 response alternatives of
+which only one is correct, then -- under the assumption of equal probabilities
+of choosing one of the alternatives in case of guessing -- we end up with a
+guessing probability of $25\%$. When modeling this guessing probability as known
+and otherwise following the recommendation presented in Section \ref{model}, we
+can write down the formula of the 3PL model as follows:
+
+```{r}
+formula_va_3pl <- bf(
+  r2 ~ 0.25 + 0.75 * inv_logit(exp(logalpha) * eta),
+  eta ~ 1 + (1 |i| item) + (1 | id),
+  logalpha ~ 1 + (1 |i| item),
+  nl = TRUE
+)
+family_va_3pl <- brmsfamily("bernoulli", link = "identity")
+```
+
+Above, we incorporated the logistic response function directly into the formula
+via `inv_logit`. As a result, the predictions of the overall sucess
+probabilities are already on the right scale and thus an additional usage of a
+link function is neither required nor reasonable. In other words, we have to
+apply the `identity` link function. Of course, we may
+also add covariates to all linear predictor terms of the model (i.e., to `eta`
+and `logalpha`) in the same way as demonstrated above for the 2PL model.
+
+If we did not know the guessing probabilities, we can decide to estimate them
+along with all other model paramters. In \pkg{brms} syntax the model then looks
+as follows:
+
+```{r}
+formula_va_3pl <- bf(
+  r2 ~ gamma + (1 - gamma) * inv_logit(exp(logalpha) * eta),
+  eta ~ 1 + (1 |i| item) + (1 | id),
+  logalpha ~ 1 + (1 |i| item),
+  logitgamma ~ 1 + (1 |i| item),
+  nlf(gamma ~ inv_logit(logitgamma)),
+  nl = TRUE
+)
+```
+
+There are some important aspects of the above model specification that require
+further explanation. Since $\gamma_i$ is a probability parameter, we need to
+restrict it between $0$ and $1$. One solution is to model $\gamma_i$ on the
+logit scale via `logitgamma ~ 1 + (1 |i| item)` and then transform it back to
+the original scale via `inv_logit`. We could have done this directly in the main
+formula but this would have implied doing the transformation twice, as `gamma`
+appears twice in the formula. For increased  efficiency, we have defined both
+`gamma` and `logitgamma` as non-linear parameters and related them via `gamma ~
+inv_logit(logitgamma)`. Passing the formula to `nlf` makes sure that the formula
+for `gamma` is treated as non-linear in the same way as setting `nl = TRUE` does
+for the main formula. 
+
+There are some general statistical problems with the 3PL model including
+estimated guessing probabilities as the interpretability of the model
+parameters, in particular of the item difficulty and discrimination, suffers as
+a result [@han2012]. Accordingly, it is probably more favorable to design items
+with known guessing probabilities in the first place.
 
 
-# Conclusion
+## Ordinal Models {#ordinal}
+
+When analysing the \code{VerbAgg} data using binary IRT models, we have assumed
+participants responses on the items to be a dichotomous `yes` vs. `no`
+decision. However, this is actually not entirely correct as the actual responses
+were obtained on an ordinal three-point scale with the options `yes`,
+`perhaps`, `no`. In the former section, we have combined `yes` and `perhaps`
+into one response category, following the analysis strategy of @deboeck2011.
+In \pkg{brms}, we are not bounded to the reducing the response to a binary
+decision and instead can use the full information in the response values
+by applying ordinal IRT models. There are multiple ordinal
+model classes [@agresti2010; @buerkner2019], one of which is the graded response model 
+(GRM; see Section \ref{respdists}). As a reminder, when modeling the responses
+$y$ via the GRM, we not only have a predictor term $\eta$, but
+also a vector $\tau$ of $C-1$ ordered latent thresholds, where $C$ is the number
+of categories ($C = 3$ for the \code{VerbAgg} data). An illustration of the 
+model's assumptions is provied in Figure \ref{fig:grm}.
+
+```{r, include=FALSE}
+gg_ord <- data.frame(y = seq(-3, 3, 0.01)) %>%
+  mutate(dens = dnorm(y)) %>%
+  ggplot() +
+  geom_line(aes(y, dens), size = 1.2) +
+  ylab("") +
+  theme(
+    axis.text.y = element_blank(),
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.text.x = element_text(size = 14),
+    plot.title = element_text(hjust = 0.5)
+  )
+```
+
+```{r grm, echo=FALSE, fig.cap = "Assumptions of the graded response model when applied to the \\code{VerbAgg} data. The area under the curve in each bin represents the probability of the corresponding event given the set of possible events for the latent variable $\\tilde{y}$, which depends linearily on the predictor term $\\eta$.", fig.height=2, fig.width=6}
+gg_ord +
+  xlab(expression(tilde(y))) +
+  geom_vline(xintercept = c(-2, 0.5)) +
+  ylim(c(0, 0.45)) +
+  annotate(x = -2.7, y = 0.42, label = "y = no", geom = "label") +
+  annotate(x = -1.2, y = 0.42, label = "y = perhaps", geom = "label") +
+  annotate(x = 1.4, y = 0.42, label = "y = yes", geom = "label") +
+  scale_x_continuous(
+    breaks = c(-2, 0.5),
+    labels = expression(tau[1], tau[2])
+  )
+```
+
+The model specification of the GRM, or for that matter of any ordinal model
+class, is highly similar to binary models. The only changes are that we switch
+out the binary variable `r2` in favor of the three-point ordinal variable `resp`
+and use the `cumulative` instead of the `bernoulli` family:
+
+```{r, eval=FALSE}
+formula_va_ord_1pl <- bf(resp ~ 1 + (1 | item) + (1 | id))
+fit_va_ord_1pl <- brm(
+  formula = formula_va_ord_1pl,
+  data = VerbAgg,
+  family = brmsfamily("cumulative", "logit"),
+  prior = prior_va_1pl
+)
+```
+
+```{r, include=FALSE}
+fit_va_ord_1pl <- brm(
+	formula = formula_va_ord_1pl,
+	data = VerbAgg,
+	family = brmsfamily("cumulative", "logit"),
+	prior = prior_va_1pl,
+  file = "models/fit_va_ord_1pl"
+)
+fit_va_ord_1pl <- add_loo(fit_va_ord_1pl)
+```
+
+The `summary` and `plot` output look very similar to the ones from the binary
+model except that we now see two intercepts, which represent the ordinal
+thresholds. We do not show their outputs here for reasons of brevity. Instead,
+let us focus on what exactly has changed in the estimation of the person
+parameters. As displayed on the left-hand side of Figure
+\ref{fig:va-person-scatter}, person parameters estimated by the binary and those
+estimated by the ordinal model are largely in alignment with each other
+although we observe bigger differences for larger values. The latter is to be
+expected since, in the ordinal model, we kept the two higher categories
+`perhaps` and `yes` separate thus increasing the information for larger but not
+so much for smaller person parameters. In accordance with this observation, we
+see that the person parameters whose precision has increased the most through
+the usage of an ordinal model are those with large mean values (see right-hand
+side of Figure \ref{fig:va-person-scatter}). Taken together, we clearly gain
+something from correctly treating the response as ordinal, not only
+theoretically -- `perhaps` is certainly something else than `yes` most
+people's mind -- but also statistically by increasing the precision of the
+estimates.
+
+```{r coef-person-va-ord-1pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_1pl}."}
+ranef_fit_va_ord_1pl <- ranef(fit_va_ord_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_fit_va_ord_1pl$id[, , "Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column() %>%
+	select(-Est.Error) %>%
+	arrange(Estimate) %>%
+	mutate(id = seq_len(n())) %>%
+	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	geom_pointrange(alpha = 0.7) +
+	coord_flip() +
+	labs(x = "Person Number (Sorted)")
+```
+
+```{r va-person-scatter, echo=FALSE, fig.width=9, fig.height=4, fig.cap="Relationship of person parameters estimated by the binary 1PL model and the ordinal graded response model. Posterior means are shown on the left-hand side and Posterior standard deviations are shown on the right-hand side."}
+df_person_1pl <- as_tibble(cbind(
+	mean_va_1pl = ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
+	mean_va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Estimate", "Intercept"],
+	se_va_1pl = ranef_fit_va_1pl$id[, "Est.Error", "Intercept"],
+	se_va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Est.Error", "Intercept"]
+))
+
+plot_mean_person <- df_person_1pl %>%
+	ggplot(aes(mean_va_1pl, mean_va_ord_1pl, color = se_va_1pl)) +
+	geom_point() +
+	geom_abline() +
+	scale_color_viridis_c() +
+	lims(x = c(-4, 5), y = c(-4, 5)) +
+	labs(
+		x = "Mean (binary)",
+	  y = "Mean (ordinal)",
+		color = "SD (binary)"
+	)
+
+plot_se_person <- df_person_1pl %>%
+	ggplot(aes(se_va_1pl, se_va_ord_1pl, color = mean_va_1pl)) +
+	geom_point() +
+	geom_abline() +
+	scale_color_viridis_c() +
+	lims(x = c(0.3, 0.8), y = c(0.3, 0.8)) +
+	labs(
+		x = "SD (binary)",
+	  y = "SD (ordinal)",
+		color = "Mean (binary)"
+	)
+
+plot_mean_person + plot_se_person
+```
+
+Similar to the binary case, one important extention to the standard GRM is to
+assume varying discriminations across items. The resulting
+generalized GRM is also a generalization of the binary 2PL model for
+ordinal responses. We had seen in Section \ref{binary} that discriminations were
+very similar across items in the binary case and we now want to take a look
+again when modeling the full ordinal response. We have to do this with a
+slightly different formula syntax, though, as the non-linear syntax of
+\pkg{brms} cannot handle the ordinal thresholds in a way that is required when
+adding discrimination parameters. However, as having discrimination parameters
+in ordinal models is crucial for IRT, \pkg{brms} provides a distributional
+parameter `disc` for specifically for that purpose. We can predict this
+discrimination parameter using the distributional regression
+framework\footnote{If \code{disc} is not predicted, it is automatically fixed to
+\code{1}.}. By default, `disc` is modeled on the log-scale to ensure that the actual
+discrimination estimates are positive (see Section \ref{binary} for discussion
+in that issue). The model formula of the generalized GRM is given by
+
+```{r}
+formula_va_ord_2pl <- bf(
+  resp ~ 1 + (1 |i| item) + (1 | id),
+  disc ~ 1 + (1 |i| item)	
+)
+```
+
+We specify some weakly informative priors on the hierarchical 
+standard deviations
+
+```{r}
+prior_va_ord_2pl <- 
+  prior("normal(0, 3)", class = "sd", group = "id") + 
+  prior("normal(0, 3)", class = "sd", group = "item") +
+  prior("normal(0, 1)", class = "sd", group = "item", dpar = "disc")
+```
+
+and finally fit the model:
+
+```{r, eval = FALSE}
+fit_va_ord_2pl <- brm(
+  formula = formula_va_ord_2pl,
+  data = VerbAgg,
+  family = brmsfamily("cumulative", "logit"),
+  prior = prior_va_ord_2pl
+)
+```
+
+```{r, include=FALSE}
+fit_va_ord_2pl <- brm(
+	formula = formula_va_ord_2pl,
+	data = VerbAgg,
+	family = brmsfamily("cumulative", "logit"),
+	prior = prior_va_ord_2pl,
+  file = "models/fit_va_ord_2pl"
+)
+fit_va_ord_2pl <- add_loo(fit_va_ord_2pl)
+```
+
+```{r, include=FALSE}
+summary(fit_va_ord_2pl)
+```
+
+A visualization of the item parameters can be found in 
+Figure \ref{fig:coef-item-va-ord-2pl}, in which we clearly see
+that discrimination do not vary across items in the GRM either.
+
+```{r coef-item-va-ord-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap="Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_ord\\_2pl}."}
+coef_fit_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
+eta <- coef_fit_va_ord_2pl$item[, , "Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column()
+alpha <- coef_fit_va_ord_2pl$item[, , "disc_Intercept"] %>%
+	exp() %>%
+	as_tibble() %>%
+	rownames_to_column()
+bind_rows(eta, alpha, .id = "nlpar") %>%
+	select(-Est.Error) %>%
+	rename(item = "rowname") %>%
+	mutate(item = as.numeric(item)) %>%
+	mutate(nlpar = factor(nlpar, labels = c("Easiness", "Discrimination"))) %>%
+	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	facet_wrap("nlpar", scales = "free_x") +
+	geom_pointrange() +
+	coord_flip() +
+	labs(x = "Item Number")
+```
+
+```{r coef-person-va-ord-2pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_2pl}."}
+ranef_fit_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_fit_va_ord_2pl$id[, , "Intercept"] %>%
+	as_tibble() %>%
+	rownames_to_column() %>%
+	select(-Est.Error) %>%
+	arrange(Estimate) %>%
+	mutate(id = seq_len(n())) %>%
+	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	geom_pointrange(alpha = 0.7) +
+	coord_flip() +
+	labs(x = "Person Number (Sorted)")
+```
+
+```{r, include=FALSE}
+cor_person <- cbind(
+	va_1pl = ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
+	va_2pl = ranef_fit_va_2pl$id[, "Estimate", "eta_Intercept"],
+	va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Estimate", "Intercept"],
+	va_ord_2pl = ranef_fit_va_ord_2pl$id[, "Estimate", "Intercept"]
+) %>%
+	cor() %>%
+	round(3)
+
+cor_person
+```
+
+Having made the decision to stick to the GRM with constant discrimination,
+we again turn to the analysis of item and person covariates. These can
+be specified in the same way as for binary models. For instance,
+the GRM with both item and person covariates, and interaction between
+`mode` and `Gender`, as well as varying item parameters over `Gender` and
+varying person person parameters over `mode` would look as follows:
+
+```{r, eval=FALSE}
+resp ~ Anger + Gender + btype + situ + mode + mode:Gender +
+  (0 + Gender | item) + (0 + mode | id)
+```
+
+```{r, include=FALSE}
+formula_va_ord_cov1 <- bf(
+	resp ~ Anger + Gender + btype + situ + mode + mode:Gender +
+	(0 + Gender | item) + (0 + mode | id)
+)
+fit_va_ord_cov1 <- brm(
+  formula = formula_va_ord_cov1,
+  data = VerbAgg, 
+  family = brmsfamily("cumulative", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_ord_cov1"
+)
+fit_va_ord_cov1 <- add_loo(fit_va_ord_cov1)
+```
+
+```{r, echo=FALSE}
+bab <- round(posterior_summary(fit_va_1pl_cov2, pars = "b_Anger"), 2)
+bao <- round(posterior_summary(fit_va_ord_cov1, pars = "b_Anger"), 2)
+```
+
+We fit it the model as usual with the `brm` function and focus on the effect
+of trait `Anger` covariate in the following. 
+First, let us compare the regression coefficients
+of `Anger` as obtained by the binary model and the GRM. We estimate
+$b_{\rm 1PL} =$ `r bab[, "Estimate"]` ($95\% \; \text{CI} = [$`r bab[, "Q2.5"]`, 
+`r bab[, "Q97.5"]`$]$) for the 1PL model and $b_{\rm GRM} =$ 
+(`r bao[, "Estimate"]`, $95\% \; \text{CI} = [$`r bao[, "Q2.5"]`, 
+`r bao[, "Q97.5"]`$]$) for the GRM, which turns out to be similar.
+Of course, this it not necessarily true in general and we cannot know for
+sure before having fitted both models. What will clearly be different are
+the predicted response probabilities as we now have three instead of two 
+categories:
+
+```{r me-va-ord-cov1, fig.height=5, fig.width=10, fig.cap="Expected probabilities of the three response categories in the \\code{VerbAgg} data as a function of trait anger conditioned on all other categorical covariates being set to their reference categories and numerical covariates being set to their mean."}
+marginal_effects(fit_va_ord_cov1, effects = "Anger", categorical = TRUE)
+```
+
+As can be seen in Figure \ref{fig:me-va-ord-cov1}, increased trait anger is
+associated with higher probabilities of agreeing to items (`yes`) as compared to
+choosing `no` or `perhaps`. Although the plot may look like an interaction effect
+between `Anger` and the response variable `resp`, it really is just based on the
+single regression coefficient effecting the predicted probabilities of all
+response categories. Plotting predicted response probabilities instead of the 
+response values themselves is recommend in ordinal models as the latter
+assumes equidistant categories, which is likely an invalid assumption for
+ordinal responses. That is, the perceived difference between `no` and `perhaps`
+in the participants' minds may be very different than the perceived difference
+between `perhaps` and `yes`.
+
+This is also what leads us to another potential problem with our model 
+assumption, which is that the predictors are assumed to have a constant
+effect across all response categories. For instance, it may very well be 
+that `Anger` has little effect on the choice between `no` and `perhaps`
+but a much stronger one on the choice between `perhaps` and `yes`. 
+This can be explicitely modeled and tested via what we call *category
+specific effects*, which implies estimating as many regression coefficients
+per category specific predictor as there are thresholds ($C - 1 = 2$ in our case).
+Unfortunately, we cannot reliably model category specific effects in the GRM
+as it may imply negative response category probabilities [@buerkner2019]. Instead,
+we have to use another ordinal model and we choose the *partial credit model*
+[PCM; @rasch1961] for this purpose (see Section \ref{respdists} for details). 
+In the PCM, modeling category specific effects is possible because we assume
+not one but $C - 1$ latent variables which may have different predictor terms
+(see Figure \ref{fig:pcm} for an illustration).
+
+```{r pcm, echo=FALSE, fig.cap = "Assumptions of the partial credit model when applied to the \\code{VerbAgg} data. The area under the curve in each bin represents the probability of the corresponding event given the set of possible events for the latent variables $\\tilde{y}_1$ and $\\tilde{y}_2$, respectively, which depend linearily on the predictor term $\\eta$.", fig.height=2, fig.width=6}
+gg_ord_pcm1 <- gg_ord +
+  xlab(expression(tilde(y)[1])) +
+  geom_vline(xintercept = c(-0.5)) +
+  ylim(c(0, 0.45)) +
+  annotate(x = -1.8, y = 0.42, label = "y = no", geom = "label") +
+  annotate(x = 1.7, y = 0.42, label = "y = perhaps", geom = "label") +
+  scale_x_continuous(
+    breaks = c(-0.5),
+    labels = expression(tau[1])
+  )
+
+gg_ord_pcm2 <- gg_ord +
+  xlab(expression(tilde(y)[2])) +
+  geom_vline(xintercept = c(0.2)) +
+  ylim(c(0, 0.45)) +
+  annotate(x = -1.8, y = 0.42, label = "y = perhaps", geom = "label") +
+  annotate(x = 1.6, y = 0.42, label = "y = yes", geom = "label") +
+  scale_x_continuous(
+    breaks = c(0.2),
+    labels = expression(tau[2])
+  )
+
+gg_ord_pcm1 + gg_ord_pcm2
+```
+
+Having selected an ordinal model class in which category specific effects are
+possible, all we need to do is wrap the covariate in `cs()` to estimate category
+specific effects. Suppose, we only want to model `Anger` as category specific,
+then we replace `Anger` with `cs(Anger)` in the model formula and leave
+the rest of the formula unchanged:
+
+```{r, eval=FALSE}
+resp ~ cs(Anger) + Gender + btype + situ + mode + mode:Gender +
+  (0 + Gender | item) + (0 + mode | id)
+```
+
+```{r, include=FALSE}
+formula_va_ord_cov2 <- bf(
+  resp ~ cs(Anger) + Gender + btype + situ + mode + mode:Gender +
+	(0 + Gender | item) + (0 + mode | id)
+)
+fit_va_ord_cov2 <- brm(
+  formula = formula_va_ord_cov2,
+  data = VerbAgg, 
+  family = brmsfamily("acat", "logit"),
+  prior = prior_va_1pl,
+  file = "models/fit_va_ord_cov2"
+)
+fit_va_ord_cov2 <- add_loo(fit_va_ord_cov2) 
+```
+
+```{r, echo=FALSE}
+bac <- round(posterior_summary(fit_va_ord_cov2, pars = "bcs_Anger"), 2)
+```
+
+The model is then fitted with \pkg{brms} in the same way as the GRM
+except that we replace `family = brmsfamily("cumulative", "logit")` by
+`family = brmsfamily("acat", "logit")`. As the category specific coefficients 
+for `Anger` on the logit-scale we obtain $b_{\rm PCM 1} =$ `r bac[1, "Estimate"]` 
+($95\% \; \text{CI} = [$`r bac[1, "Q2.5"]`, `r bac[1, "Q97.5"]`$]$) and 
+$b_{\rm PCM 2} =$ (`r bac[2, "Estimate"]`, 
+$95\% \; \text{CI} = [$`r bac[2, "Q2.5"]`, `r bac[2, "Q97.5"]`$]$).
+That is, `Anger` seems to play a mucher stronger role in the decision
+between `perhaps` and `yes` than between `no` and `perhaps`. 
+We may also visualize the effect via
+
+```{r me-va-ord-cov2, fig.height=5, fig.width=10, fig.cap="Expected response probabilities as predicted by model \\code{fit\\_va\\_ord\\_cov2} as a function of trait anger conditioned on all other categorical covariates being set to their reference categories and numerical covariates being set to their mean."}
+marginal_effects(fit_va_ord_cov2, effects = "Anger", categorical = TRUE)
+```
+
+When we compare Figure \ref{fig:me-va-ord-cov2} to Figure \ref{fig:me-va-ord-cov1},
+we see that for higher `Anger` values a higher probability of
+choosing `yes` and a lower probability of choosing `perhaps` is predicted
+by the category specific PCM as compared to the basic GRM. This is also
+in accordance with our interpretation of the coefficients above.
+
+## Response Times Models {#response-times}
+
+In this example, we will analyze a small data set of 121 subjects on 10 items
+measuring mental rotation that is shipped with the \pkg{diffIRT} package
+[@diffIRT; see also @vandermaas2011]. The full data is described in
+@borst2011. Each item consists of a graphical display of two 3-dimensional
+objects. The second object is either a rotated version of the first one or a rotated
+version of a different object. The degree of rotation (variable `rotate`) takes
+on values of 50, 100, or 150 and is constant for each item. Participants were
+asked whether the two objects are the same (yes/no) and the response is stored
+as either correct (1) or incorrect (0) (variable \code{resp}). The response
+time in seconds (variable \code{time}) was recorded as well. A glimpse of the
+data is provided in Table \ref{tab:head-rotation}.
+
+```{r rotation, echo=FALSE}
+data("rotation", package = "diffIRT")
+rotation <- rotation %>%
+	as_tibble() %>%
+	mutate(person = seq_len(n())) %>%
+	gather("key", "value", -person) %>%
+	extract("key", into = c("type", "item"), regex = "(.)\\[(.+)\\]") %>%
+	spread("type", "value") %>%
+	rename(time = T, resp = X) %>%
+	mutate(
+		rotate = factor(case_when(
+		  item %in% c(2, 5, 8) ~ 50,
+		  item %in% c(3, 6, 10) ~ 100,
+		  item %in% c(1, 4, 7, 9) ~ 150
+	  )),
+		item = as.numeric(item)
+	)
+```
+
+```{r head-rotation, echo=FALSE}
+head(rotation, 10) %>%
+	kable(
+    caption = "First ten rows of the \\texttt{rotation} data.",
+    booktabs = TRUE,
+    escape = FALSE
+	)
+```
+
+We will start by analyzing the response times, only, and use the
+exgaussian distribution for this purpose. Specifically, we are interested in
+whether the degree of rotation affects the mean, variation and right-skewness of
+the response times distribution. The effect of `rotate` can be expected to be
+smooth and monotonic (up to 180 degrees) but otherwise of unknown functional
+form. In such a case, it could be beneficial to model the effect via some
+semi-parameteric methods such as splines or Gaussian processes (both of which is
+possible in \pkg{brms}), but this requires a lot more different values of
+`rotate`. Thus, for this example, we will just treat `rotate` as a factor and
+use dummy coding with $50$ degree as the reference category. Assuming all three
+parameters to vary over persons and items, we write down the formula as
+
+```{r}
+bform_exg1 <- bf(
+  time ~ rotate + (1 |p| person) + (1 |i| item),
+  sigma ~ rotate + (1 |p| person) + (1 |i| item),
+  beta ~ rotate + (1 |p| person) + (1 |i| item)
+)
+```
+
+In theory, we could also model `rotate` as having a varying effect across
+persons (as `rotate` is an item covariate). However, as we are using a subset of
+only $10$ items, modeling $9$ varying effects per person, although possible,
+will likely result in overfitting. For larger data sets, this option should
+definitely be considered more carefully. Since both `sigma`
+(the standard deviation of the Gaussian component) and `beta` (the mean
+parameter of the exponential component representing the right skewness) can only
+take on positive values, we will use `log` links for both of them (this is
+actually the default but we want to make it explicite here). Together
+this results in the following model specification:
+
+```{r, eval=FALSE}
+fit_exg1 <- brm(
+  bform_exg1, data = rotation,
+  family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
+  chains = 4, cores = 4, inits = 0,
+  control = list(adapt_delta = 0.99)
+)
+```
+
+```{r, include=FALSE}
+fit_exg1 <- brm(
+	bform_exg1, data = rotation,
+	family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
+	chains = 4, cores = 4, inits = 0,
+	control = list(adapt_delta = 0.99),
+	file = "models/fit_exg1"
+)
+```
+
+Increasing the sampling parameter `adapt_delta` reduces or ideally eliminates
+the number of "divergent transition" that indicate problems of the sampler
+exploring the full posterior distribution and thus bias the posterior estimates
+@carpenter2017; @hoffman2014]. From the standard outputs (not shown here) we can
+see that the model has converged well and produces reasonable posterior
+predictions (via \code{pp_check(fit_exg1)}; see Figure \ref{tab:pp-exg1}), so we
+can turn to investigating the effects of `rotate` on the model parameters:
+
+```{r pp-exg1, echo=FALSE, fig.height=3, fig.cap="Posterior predictions of the exgaussian model \\texttt{fit\\_exg1}."}
+pp_check(fit_exg1)
+```
+
+```{r, eval = FALSE}
+marginal_effects(fit_exg1, "rotate", dpar = "mu")
+marginal_effects(fit_exg1, "rotate", dpar = "sigma")
+marginal_effects(fit_exg1, "rotate", dpar = "beta")
+```
+
+```{r me-exg, echo=FALSE, fig.height=5, fig.width=10, fig.cap="Parameters of the exgaussian model \\texttt{fit\\_exg1} as a function of the degree of rotation."}
+me_mu <- marginal_effects(fit_exg1, "rotate", dpar = "mu")
+me_mu <- plot(me_mu, plot = FALSE)[[1]]
+me_sigma <- marginal_effects(fit_exg1, "rotate", dpar = "sigma")
+me_sigma <- plot(me_sigma, plot = FALSE)[[1]]
+me_beta <- marginal_effects(fit_exg1, "rotate", dpar = "beta")
+me_beta <- plot(me_beta, plot = FALSE)[[1]]
+me_mu + me_sigma + me_beta
+```
+
+In Figure \ref{fig:me-exg}, we see that both the mean `mu` and the variation
+`sigma` increase with increasing degree of rotation, while the skewness `beta`
+rougly stays constant. The observation that mean and variation of response times
+increase simultaneously can be made in a lot of experiments and is discussed in
+@wagenmakers2007.
+
+The analysis of the response times is interesting, but does not provide a lot of
+insights into potentially underlying cognitive processes. For this reason, we
+will also use drift diffusion models to jointly model response times and the
+binary decisions. How the drift diffusion model looks exactly depends on several
+aspects. One is whether we deal with personality or ability tests. For
+personality tests, the binary response to be modeled is the actual *choice*
+between the two alternative, whereas for ability tests may want to rather use
+the *correctness* instead [@tuerlinckx2005; @vandermaas2011]. Further, in the
+former case, person and item parameters may take on any real value and we
+combine them in additively. In contrast, for ability tests, person and item
+parameters are assumed to be positive only and combined in multiplicatively
+[@vandermaas2011]. The latter can also be expressed an additive relationship on
+the log-scale. In the present example, we deal with data of an ability test and
+will use the just described log-scale approach.
+
+Again, our interest lies primarily in the effect of the degree of rotation. More
+specifically, we are interested which of the three model parameters (drift rate,
+boundary separation, and non-decision time) are infludenced by the rotation. The
+fourth parameter, the initial bias, is fixed to $0.5$ (i.e., no bias) to obtain the
+three-parameter drift diffuson model. Assuming all three predicted parameters
+to vary over persons and items, we write down the formula as
+
+```{r}
+bform_drift1 <- bf(
+  time | dec(resp) ~ rotate + (1 |p| person) + (1 |i| item),
+  bs ~ rotate + (1 |p| person) + (1 |i| item),
+  ndt ~ rotate + (1 |p| person) + (1 |i| item),
+  bias = 0.5
+)
+```
+
+In \proglang{Stan}, drift diffusion models with predicted non-decision time are
+not only computationally much more demanding, but they also often require some
+manual specifcation of initial values. The easiest way is to set the intercept
+on the log-scale of `ndt` to a small value:
+
+```{r}
+chains <- 4
+inits_drift <- list(temp_ndt_Intercept = -3)
+inits_drift <- replicate(chains, inits_drift, simplify = FALSE)
+```
+
+We will now fit the model. This may take some more time than previous models 
+due to the complexity of the diffusion model's likelihood.
+
+```{r, eval=FALSE}
+fit_drift1 <- brm(
+  bform_drift, data = rotation, 
+  family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
+  chains = chains, cores = chains,
+  inits = inits_drift, init_r = 0.05,
+  control = list(adapt_delta = 0.99)
+)
+```
+
+```{r, include=FALSE}
+fit_drift1 <- brm(
+	bform_drift1, data = rotation, 
+	family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
+	chains = chains, cores = chains,
+	inits = inits_drift, init_r = 0.05,
+	control = list(adapt_delta = 0.99),
+	file = "models/fit_drift1"
+)
+fit_drift1 <- add_loo(fit_drift1)
+```
+
+From the standard outputs (not shown here) we can see that the model has
+converged well so we can turn to investigating the effects of `rotate` on the
+model parameters:
+
+```{r, eval = FALSE}
+marginal_effects(fit_drift1, "rotate", dpar = "mu")
+marginal_effects(fit_drift1, "rotate", dpar = "bs")
+marginal_effects(fit_drift1, "rotate", dpar = "ndt")
+```
+
+```{r me-drift, echo=FALSE, fig.height=5, fig.width=10, fig.cap="Parameters of the drift diffusion models as a function of the degree of rotation. The parameter \\texttt{mu}, \\texttt{bs}, and \\texttt{ndf} represent the drift rate, boundary separation and non-decision time, respectively."}
+me_drift <- marginal_effects(fit_drift1, "rotate", dpar = "mu")
+me_drift <- plot(me_drift, plot = FALSE)[[1]]
+me_bs <- marginal_effects(fit_drift1, "rotate", dpar = "bs")
+me_bs <- plot(me_bs, plot = FALSE)[[1]]
+me_ndt <- marginal_effects(fit_drift1, "rotate", dpar = "ndt")
+me_ndt <- plot(me_ndt, plot = FALSE)[[1]]
+me_drift + me_bs + me_ndt
+```
+
+As shown in Figure \ref{fig:me-drift}, both the drift rate and the non-decision
+time seem to be affected by the degree of rotation. The drift rate decreases
+slightly when increasing the rotation from $50$ to $100$ and roughly stays
+constant afterwards. Similarily, the non-decision time increases with increased
+rotation from $50$ to $100$ presumably as a result of the increased cognitive
+demand of processing the rotated objects [@diffIRT].
+
+```{r, echo=FALSE}
+sd_bs <- posterior_summary(fit_drift1, pars = "sd_item__bs_Intercept") %>%
+  as_tibble() %>% round(2)
+```
+
+In contrast, the boundary separation appears unaffected by the degree of
+rotation. Further, the standard deviation of the boundary separation across
+items (after controling for the rotation), seems to be very small (SD = 
+`r sd_bs$Estimate`, 95%-CI = [`r sd_bs$Q2.5`, `r sd_bs$Q97.5`]). 
+We may also test this more formally by fitting a second model without item
+effects on the boundary separation, that is using the formula `bs ~ 1 + (1 |p|
+person)`, and then comparing the models for instance via approximate LOO-CV
+(method `loo`) or Bayes factors (method `bayes_factor`). The latter requires
+carefully specified prior distributions based on subject matter knowledge, a
+topic which is out of the scope of the present paper.
+
+```{r, echo=FALSE}
+# bform_drift2 <- bf(
+# 	time | dec(resp) ~ rotate + (1 |p| person) + (1 |i| item),
+# 	bs ~ 1 + (1 |p| person),
+# 	ndt ~ rotate + (1 |p| person) + (1 |i| item),
+# 	bias = 0.5
+# )
+```
+
+```{r, eval=FALSE, echo=FALSE}
+# fit_drift2 <- brm(
+# 	bform_drift2, rotation, 
+# 	family = wiener("log", link_bs = "log", link_ndt = "log"),
+# 	chains = chains, cores = chains,
+# 	inits = inits_diff, init_r = 0.05,
+# 	control = list(adapt_delta = 0.99)
+# )
+```
+
+```{r, include=FALSE}
+# fit_drift2 <- brm(
+# 	bform_drift2, rotation,
+# 	family = wiener("log", link_bs = "log", link_ndt = "log"),
+# 	chains = chains, cores = chains,
+# 	inits = inits_diff, init_r = 0.05,
+# 	control = list(adapt_delta = 0.95),
+# 	file = "models/fit_drift2"
+# )
+# fit_drift2 <- add_loo(fit_drift2)
+```
+
+```{r, echo=FALSE}
+# loo_drift1 <- loo(fit_drift1)
+# loo_drift2 <- loo(fit_drift2)
+# print(loo_compare(loo_drift1, loo_drift2), simplify = FALSE)
+```
+
+```{r, echo=FALSE}
+# coef_drift <- coef(fit_drift1, summary = FALSE)$item %>%
+# 	exp() %>%
+# 	posterior_summary()
+# 
+# items <- rownames(coef_drift)
+# cols <- c("Estimate", "Q2.5", "Q97.5")
+# coef_drift_mu <- coef_drift[, , "Intercept"] %>%
+# 	as_tibble(rownames = NA) %>%
+# 	rownames_to_column() %>%
+# 	rename(mu = Estimate, item = rowname) %>%
+# 	mutate(item = as.numeric(item))
+# 
+# coef_drift_bs <- coef_drift[, , "bs_Intercept"] %>%
+# 	as_tibble() %>%
+# 	rename(bs = Estimate)
+# 
+# coef_drift_ndt <- coef_drift[, , "ndt_Intercept"] %>%
+# 	as_tibble() %>%
+# 	rename(ndt = Estimate)
+# 
+# coef_drift <- bind_cols(coef_drift_mu, coef_drift_bs, coef_drift_ndt) %>%
+# 	arrange(item) %>%
+# 	select(-starts_with("Est.Error"), -starts_with("Q"))
+```
+
+
+
+# Comparison of Packages {#comparison}
+
+A lot of \proglang{R} packages have been developed that implement IRT models,
+each being more or less general in their supported models. An overview of most
+of these packages is available on the Psychometrics CRAN task view 
+(\url{https://cran.r-project.org/web/views/Psychometrics.html}).
+Comparing all of them to \pkg{brms} would be too extensive and barely helpful
+for the purpose of the present paper. Accordingly, we focus on a set of seven
+widely applied, actively maintained, and sufficiently general packages that can
+be used for IRT modeling. These are \pkg{eRm} [@eRm], \pkg{ltm} [@ltm],
+\pkg{TAM} [@TAM], \pkg{mirt} [@mirt], \pkg{sirt} [@sirt], \pkg{lme4} [@lme4],
+and \pkg{lavaan} [@lavaan]. A high level overview of the modeling options of
+each package can be found in Table \ref{tab:pkg-compare} and more details are
+provided below.
+
+\pkg{eRm} focuses on models that can be estimated
+using conditional maximum likelihood, a method only available for the 1PL model
+and PCM with unidimensional latent traits per person. Accordingly, its
+application is rather limited compared to the other packages presented
+here. The \pkg{ltm}, \pkg{TAM}, and \pkg{mirt} packages all provide frameworks
+for fitting binary, categorical, and ordinal models using mostly marginal
+maximum likelihood estimation. They allow estimating discrimination parameters
+for all these model classes as well as 3PL or even 4PL models for binary
+responses. Of these three packages, \pkg{mirt}
+currently provides the most flexible framework with respect to both the models
+it can fit and the provided estimation algorithms. I also comes with its own
+modeling syntax for easy specification of factor structure and parameter
+constraints. The \pkg{sirt} package, does not provide one single framework for
+IRT models but rather a large set of separate functions to fit special IRT
+models that complement and support other packages, in particular \pkg{mirt} and
+\pkg{TAM}. As a result, input and output structures are not consistent across
+model fitting functions within \pkg{sirt}, which makes it more complicated to
+switch between model classes. All of these IRT-specific packages have built-in
+methods for investigating and testing differential item functioning.
+
+In contrast to the above packages, \pkg{lavaan} and \pkg{lme4} are not
+specifically dedicated to IRT modelling, but rather provide general frameworks
+for structural equation and multilevel models, respectively. Due to their
+generality and user-friendly interfaces, they have established themselves as the
+de facto standards in \proglang{R} when it comes to the frequentist estimation
+of these model classes. \pkg{lavaan} allows to fit multidimensional 1PL and 2PL
+binary, categorical and some ordinal IRT models using maximum likelihood or
+weighted least squares estimations. \pkg{lme4} estimates multilevel models via
+marginal maximum likelihood estimation. While it is very flexible in the
+specification of covariates and multilevel structure, for instance for the
+purpose of multidimensional IRT models, it does neither support 2PL (or higher)
+binary models, nor categorical or ordinal models.
+
+\pkg{brms} is conceptually closest to \pkg{lme4} when it comes to the model
+specification and data structuring. These two packages expect the data to be in
+long format, that is all responses to be provided in the same column, while all
+other packages expect response to be in the form of a person $\times$ item
+matrix. Accordingly, the formula syntax also differs from the other packages in
+that we have to explicitely specify item and person grouping variables as they
+cannot automatically identified from the data structure  (see Section
+\ref{brms}). The multilevel syntax of \pkg{lme4} and \pkg{brms} allows for an
+overall shorter model specification than the structural equation syntax of
+\pkg{lavaan} as items do not have to be targeted one by one. A drawback of the
+multilevel syntax is that constraining or fixing parameters is less intuitive
+and flexible than in the dedicated IRT packages or \pkg{lavaan} syntax.
+
+What makes \pkg{brms} stand out is the combination of three key features. First,
+it extends the multilevel formula syntax of \pkg{lme4} to non-linear formulas of
+arbitrary complexity, which turns out to be very powerful for the purpose of IRT
+modelling (see Section \ref{brms}). Second, it supports the widest range of
+response distributions of all the packages under comparison. This includes not
+only distributions for binary, categorical, and ordinal data, but also for
+response times, count, or even proportions to name only a few available
+options. Further, users may specify their own response distributions via the
+\code{custom_family} feature. Third, not only the main location parameter but
+also all other parameters of the response distribution may be predicted by means
+of the non-linear multilevel syntax. In addition, multiple different response
+variables can be combined in a joint multivariate model in order to let person
+and/or item parameters inform each other, respectively, across response variables.
+
+Another difference between \pkg{brms} and the other packages is that the
+former is fully Bayesian while the latter are mostly based
+point estimation methods. \pkg{TAM} and \pkg{mirt} support setting certain prior
+distributions on parameters but still perform estimation via optimization.
+\pkg{sirt} offers MCMC sampling only for 2PL and 3PL models with
+restrictive prior options and almost no built-in methods to post-process
+results. While performing full Bayesian inference via MCMC sampling is often
+orders of magnitude slower than point estimation via maximum likelihood or least
+squares, the obtained information is much higher: Not only do we get the
+posterior distribution of all model parameters, but also the posterior
+distribution of all quantities that can be computed on their basis [@gelman2014]. 
+For instance, the uncertainty in the paramters' posterior naturally propagates to
+the posterior predictive distributions, whose uncertainty can then be visualized
+along with the mean predictions. \pkg{brms} automates a lot of common
+post-processing tasks, such as posterior visualizations, predictions, and model
+comparison (see \code{methods(class = "brmsfit")} for a full list of options).
+
+```{r, echo=FALSE}
+pcom <- tibble(
+	Feature = c("eRm", "ltm", "TAM", "mirt", "sirt", "lavaan", "lme4", "brms"),
+	"1-PLM" = rep("yes", 8),
+	"2-PLM" = c("no", "yes", "yes", "yes", "yes", "yes", "no", "yes"),
+	"3-PLM" = c("no", "yes", "yes", "yes", "yes", "no", "no", "yes"),
+	"4-PLM" = c("no", "no", "no", "yes", "yes", "no", "no", "yes"),
+	PCM = c("yes", "yes", "yes", "yes", "yes", "no", "no", "yes"),
+	GRM = c("no", "yes", "no", "yes", "yes", "yes", "no", "yes"),
+	CM = c("no", "no", "yes", "yes", "no", "no", "no", "yes"),
+  LM = c("no", "no", "no", "no", "yes", "yes", "yes", "yes"),
+	CoM = c("no", "no", "no", "no", "no", "no", "yes", "yes"),
+	RTM = c("no", "no", "no", "no", "no", "limited", "limited", "yes"),
+	PrM = c(rep("no", 7), "yes"),
+	Multidimensional = c("no", "no", "yes", "yes", "yes", "yes", "yes", "yes"),
+	Covariates = rep("yes", 8),
+	Constraints = c("no" , "yes", "yes", "yes", "yes", "yes", "limited", "limited"),
+  "Latent classes" = c("no", "no", "yes", "yes", "yes", "no", "no", "no"),
+	Mixtures = c("no", "no", "yes", "yes", "yes", "no", "no", "yes"),
+	Copulas = c("no", "no", "limited", "no", "limited", "no", "no", "no"),
+	Splines = c("no", "no", "no", "yes", "yes", "no", "no", "yes"),
+	Multilevel = c("no", "no", "no", "yes", "limited",	"limited", "yes", "yes"),
+	"Joint models" = c("no", "no", "no", "yes", "no", "yes", "no", "yes"),
+	Imputation = c("no", "no", "yes", "yes", "yes", "no", "no", "yes"),
+	Customizable = c(rep("no", 7), "yes"),
+	Estimator = c("CML", "MML", "MML,JML", "MML", "various", "various", "MML", "AHMC")
+)
+```
+
+```{r pkg-compare, cache=FALSE, echo=FALSE}
+t(pcom) %>%
+	kable(
+    caption = "Overview of modeling options in IRT supporting packages.",
+    booktabs = TRUE,
+    escape = FALSE
+  ) %>%
+	footnote(
+    general = "Abbreviations: x-PLM = x-parameter logistic models; PCM = partial credits models; GRM = graded response models; CM = categorical models; LM = linear models; CoM = count data models; RTM = response times models; PrM =  Proportion models (i.e., Beta and Dirichlet models); CML = conditional maximum likelihood; MML = marginal maximum likelihood; JML = joint maximum likelihood; WLS = weighted least squres; AHMC = adaptive Hamiltonian Monte-Carlo.",
+    general_title = "",
+    threeparttable = TRUE,
+    escape = FALSE
+  ) %>%
+	add_header_above(c(" " = 1, "Package" = 8)) %>%
+	row_spec(1, hline_after = TRUE) %>%
+	row_spec(12, hline_after = TRUE)
+```
+
+# Conclusion {#conclusion}
+
+In this paper, we have introduced a general framework for fitting Bayesian IRT
+models in \proglang{R} via \pkg{brms} and \proglang{Stan}. Within this
+framework, a wide range of IRT models can be specified, estimated, and
+post-processed in a consistent manner, without the need to switch between
+packages to obtain results for different IRT model classes. To our knowledge,
+the flexibility of the proposed framework is currently unmatched by any
+publically available IRT software. We have demonstrated its usefulness in
+examples of binary, ordinal, and response times data, although the framework
+entails a lot of other IRT model classes.
+
+The advanced formula syntax of \pkg{brms} further enables the modeling of complex
+non-linear relationships between person and item parameters and the observed
+responses. However, the flexibility of the framework does not free the user from
+specifying reasonable models for their data. Just because a model can be
+estimated without problems does not mean it is also sensible from a
+theoretical perspective or provides valid inference about the effects 
+under study. Tools for model comparison and selection as provided by \pkg{brms}
+may help in guiding users' decision, but should not be a substitute for clear
+theoretical reasoning and subject matter knowledge to guide model development
+and evaluation.
+
+Taking a Bayesian perspective on specification, estimation, and post-processing
+of statistical models helps in building and fitting more complex and realistic
+models, but it is not the only reason for adopting it. As Bayesian statistics is
+fully embedded into probability theory, we can quantify uncertainty of any
+variable of interest using probability and make decisions by averaging over that
+uncertainty. Thus, we no longer have to fall back on premature binary decision
+making on the basis of, say, frequentist p-values or confidence intervals.
+As such, Bayesian inference is not just another estimation method but
+a distinct statistical framework to reason from data using probabilistic
+models.
+
+
+# Acknowledgements
+
+I would like to thank my colleagues of the \proglang{Stan} Development Team for
+creating, maintaining, and continuously improving \proglang{Stan}, which forms
+the basis for the success of \pkg{brms}. I would also like to thank all the
+users who reported bugs or had ideas for new features, thus helping to further
+improve \pkg{brms}.
+
+
+# References
+

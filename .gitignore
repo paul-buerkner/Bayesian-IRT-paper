@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+docs/
+models/
+*_cache/
+*_files/
