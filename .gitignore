@@ -4,5 +4,7 @@
 .Ruserdata
 docs/
 models/
+archive/
 *_cache/
 *_files/
+*.log
