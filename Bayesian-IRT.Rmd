@@ -1079,8 +1079,8 @@ coef_fit_va_1pl$item[, , "Intercept"] %>%
 ```
 
 ```{r coef-person-va-1pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_1pl}."}
-ranef_fit_va_1pl <- ranef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
-ranef_fit_va_1pl$id[, , "Intercept"] %>%
+ranef_va_1pl <- ranef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_1pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
@@ -1205,8 +1205,8 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 ```
 
 ```{r coef-person-va-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_2pl}."}
-ranef_fit_va_2pl <- ranef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
-ranef_fit_va_2pl$id[, , "eta_Intercept"] %>%
+ranef_va_2pl <- ranef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_2pl$id[, , "eta_Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
@@ -1246,8 +1246,8 @@ fit_va_1pl_alpha <- add_loo(fit_va_1pl_alpha)
 
 ```{r, include=FALSE}
 cor_1pl_2pl <- cor(
-	ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
-	ranef_fit_va_2pl$id[, "Estimate", "eta_Intercept"]
+	ranef_va_1pl$id[, "Estimate", "Intercept"],
+	ranef_va_2pl$id[, "Estimate", "eta_Intercept"]
 )
 
 loo_1pl_2pl <- loo_compare(loo(fit_va_1pl), loo(fit_va_2pl))
@@ -1678,8 +1678,8 @@ people's mind -- but also statistically by increasing the precision of the
 estimates.
 
 ```{r coef-person-va-ord-1pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_1pl}."}
-ranef_fit_va_ord_1pl <- ranef(fit_va_ord_1pl, robust = TRUE, probs = c(0.05, 0.95))
-ranef_fit_va_ord_1pl$id[, , "Intercept"] %>%
+ranef_va_ord_1pl <- ranef(fit_va_ord_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_ord_1pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
@@ -1693,10 +1693,10 @@ ranef_fit_va_ord_1pl$id[, , "Intercept"] %>%
 
 ```{r va-person-scatter, echo=FALSE, fig.width=9, fig.height=4, fig.cap="Relationship of person parameters estimated by the binary 1PL model and the ordinal graded response model. Posterior means are shown on the left-hand side and Posterior standard deviations are shown on the right-hand side."}
 df_person_1pl <- as_tibble(cbind(
-	mean_va_1pl = ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
-	mean_va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Estimate", "Intercept"],
-	se_va_1pl = ranef_fit_va_1pl$id[, "Est.Error", "Intercept"],
-	se_va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Est.Error", "Intercept"]
+	mean_va_1pl = ranef_va_1pl$id[, "Estimate", "Intercept"],
+	mean_va_ord_1pl = ranef_va_ord_1pl$id[, "Estimate", "Intercept"],
+	se_va_1pl = ranef_va_1pl$id[, "Est.Error", "Intercept"],
+	se_va_ord_1pl = ranef_va_ord_1pl$id[, "Est.Error", "Intercept"]
 ))
 
 plot_mean_person <- df_person_1pl %>%
@@ -1812,8 +1812,8 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 ```
 
 ```{r coef-person-va-ord-2pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_2pl}."}
-ranef_fit_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
-ranef_fit_va_ord_2pl$id[, , "Intercept"] %>%
+ranef_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_ord_2pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
@@ -1827,10 +1827,10 @@ ranef_fit_va_ord_2pl$id[, , "Intercept"] %>%
 
 ```{r, include=FALSE}
 cor_person <- cbind(
-	va_1pl = ranef_fit_va_1pl$id[, "Estimate", "Intercept"],
-	va_2pl = ranef_fit_va_2pl$id[, "Estimate", "eta_Intercept"],
-	va_ord_1pl = ranef_fit_va_ord_1pl$id[, "Estimate", "Intercept"],
-	va_ord_2pl = ranef_fit_va_ord_2pl$id[, "Estimate", "Intercept"]
+	va_1pl = ranef_va_1pl$id[, "Estimate", "Intercept"],
+	va_2pl = ranef_va_2pl$id[, "Estimate", "eta_Intercept"],
+	va_ord_1pl = ranef_va_ord_1pl$id[, "Estimate", "Intercept"],
+	va_ord_2pl = ranef_va_ord_2pl$id[, "Estimate", "Intercept"]
 ) %>%
 	cor() %>%
 	round(3)
