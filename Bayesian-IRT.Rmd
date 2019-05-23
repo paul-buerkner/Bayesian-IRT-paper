@@ -70,7 +70,7 @@ measurement. The best known IRT models are likely those for binary responses,
 which predict the probability of a correct answer depending on the item's
 difficulty and potentially other item properties as well as the participant's
 latent ability. The scope of IRT models is however much wider than this, and we
-will discuss many more interesting models in this paper.
+will discuss several more interesting models in this paper.
 
 Over the years, a multitude of software packages have been
 developed that implement IRT models. To date, most free and open source software
