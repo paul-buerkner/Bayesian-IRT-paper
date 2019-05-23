@@ -5,6 +5,7 @@
 docs/
 models/
 archive/
+submission/
 *_cache/
 *_files/
 *.log
