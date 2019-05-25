@@ -468,7 +468,7 @@ very intensive and thus fitting models using full Bayesian inference is usually
 much slower than in point estimation techniques. However, advantages of Bayesian
 inference -- such as greater modeling flexibility, prior distributions, and more
 informative results -- are often worth the increased computational cost
-[@gelman2014].
+[@gelman2013].
  
 In the following, we will explain important aspects concerning the choice of priors 
 for person parameters, although the same ideas apply to item parameters as 
@@ -477,7 +477,7 @@ person parameter (and/or items parameters) to share a common hierarchical prior
 or if we want to specify independent priors on each parameter. In the latter
 case, we would choose a prior and then fix its hyperparameters according to our
 understanding of the scale and prior knowledge about the parameter(s) to be
-estimated [@gelman2014]. To make a concrete example, we can assume a normal
+estimated [@gelman2013]. To make a concrete example, we can assume a normal
 distribution with mean $0$ and standard deviation $3$ for the person parameters
 of a Rasch model:
 
@@ -1038,8 +1038,8 @@ Figure \ref{fig:plot-va-1pl}) or more recently proposed rank plots
 [@vehtari2019]. On that basis, we interpret MCMC chains as having converged to
 the same target distribution, if the chains are mixing well individually (i.e.,
 quickly jumping up and down) and are overlaying one another at the same time
-[@gelman2014]. We may also investigate convergence numerically by mean of the
-scale reduction factor $\widehat{R}$ [@gelman1992; @gelman2014; @vehtari2019],
+[@gelman2013]. We may also investigate convergence numerically by mean of the
+scale reduction factor $\widehat{R}$ [@gelman1992; @gelman2013; @vehtari2019],
 which should be close to one (i.e., $\widehat{R} < 1.05$), and the effective
 sample size, which should be as large as possible but at least 400 to merely
 ensure reliable convergence diagnostics [@vehtari2019]. The corresponding
@@ -2384,7 +2384,7 @@ inference via MCMC sampling is often orders of magnitude slower than point
 estimation via maximum likelihood or least squares, the obtained information may
 be considered to be much higher: Not only do we get the posterior distribution
 of all model parameters, but also the posterior distribution of all quantities
-that can be computed on their basis [@gelman2014]. For instance, the uncertainty
+that can be computed on their basis [@gelman2013]. For instance, the uncertainty
 in the paramters' posterior naturally propagates to the posterior predictive
 distributions, whose uncertainty can then be visualized along with the mean
 predictions. \pkg{brms} automates a lot of common post-processing tasks, such as
