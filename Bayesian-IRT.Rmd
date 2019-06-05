@@ -2369,7 +2369,9 @@ response distributions of all the packages under comparison. This includes not
 only distributions for binary, categorical, and ordinal data, but also for
 response times, count, or even proportions to name only a few available
 options. Further, users may specify their own response distributions via the
-\code{custom_family} feature. Third, not only the main location parameter but
+\code{custom_family} feature, fulfilling a similar purpose as
+\code{mirt::createItem} or \code{sirt::xxirt}.
+Third, not only the main location parameter but
 also all other parameters of the response distribution may be predicted by means
 of the non-linear multilevel syntax. In addition, multiple different response
 variables can be combined in a joint multivariate model in order to let person
@@ -2416,7 +2418,7 @@ pcom <- tibble(
 	Multilevel = c("no", "no", "no", "yes", "limited",	"limited", "yes", "yes"),
 	"Joint models" = c("no", "no", "no", "yes", "no", "yes", "no", "yes"),
 	Imputation = c("no", "no", "yes", "yes", "yes", "no", "no", "yes"),
-	Customizable = c(rep("no", 7), "yes"),
+	Customizable = c("no", "no", "no", "yes", "yes", "no", "no", "yes"),
 	Estimator = c("CML", "MML", "MML,JML", "MML", "various", "various", "MML", "AHMC")
 )
 ```
@@ -2479,9 +2481,9 @@ models.
 I would like to thank my colleagues of the \proglang{Stan} Development Team for
 creating, maintaining, and continuously improving \proglang{Stan}, which forms
 the basis for the success of \pkg{brms}. Further, I want to thank Marie
-Beisemann for valuable comments on earlier versions of the paper. Finally, I
-would like to thank all the users who reported bugs or had ideas for new
-features, thus helping to further improve \pkg{brms}.
+Beisemann and Alexander Robitzsch for valuable comments on earlier versions of
+the paper. Finally, I would like to thank all the users who reported bugs or had
+ideas for new features, thus helping to further improve \pkg{brms}.
 
 
 # References
