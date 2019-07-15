@@ -72,18 +72,18 @@ difficulty and potentially other item properties as well as the participant's
 latent ability. The scope of IRT models is however much wider than this, and I
 will discuss several more interesting models in this paper.
 
-Over the years, a multitude of software packages have been
-developed that implement IRT models. To date, most free and open source software
-in the field of IRT is written in the programming language \proglang{R} [@R],
-which has grown to become one of the primary languages for statistical
-computing. Examples for widely applied and actively maintained IRT specific
-\proglang{R} packages are \pkg{eRm} [@eRm], \pkg{ltm} [@ltm], \pkg{TAM}
-[@TAM], \pkg{mirt} [@mirt], and \pkg{sirt} [@sirt]. Each of them supports
-certain classes of IRT models and related post-processing methods. Further, IRT
-models may also be specified in general purpose multilevel or structural
-equation modeling packages such as \pkg{lme4} [@lme4] or \pkg{lavaan} [@lavaan].
-I will provide a review and comparison of these package later on in Section
-\ref{comparison}.
+Over the years, a multitude of software packages have been developed that
+implement IRT models. To date, most free and open source software in the field
+of IRT is written in the programming language \proglang{R} [@R], which has grown
+to become one of the primary languages for statistical computing. Examples for
+widely applied and actively maintained IRT specific \proglang{R} packages are
+\pkg{eRm} [@eRm], \pkg{ltm} [@ltm], \pkg{TAM} [@TAM], \pkg{mirt} [@mirt],
+\pkg{sirt} [@sirt], and \pkg{psychotree} [@psychotree1;@psychotree2]. Each of
+them supports certain classes of IRT models and related post-processing methods.
+Further, IRT models may also be specified in general purpose multilevel or
+structural equation modeling packages such as \pkg{lme4} [@lme4], \pkg{lavaan}
+[@lavaan], or \pkg{blavaan} [@blavaan]. I will provide a review and comparison
+of these package later on in Section \ref{comparison}.
 
 In this paper, I present a Bayesian IRT framework based on the \proglang{R}
 package \pkg{brms} [@brms1; @brms2] and the probabilistic programming language
@@ -97,34 +97,50 @@ not natively supported by \pkg{brms} for application in the proposed framework.
 The non-linear multilevel formula syntax of \pkg{brms} allows for a flexible yet
 concise specification of multidimensional IRT models, with an arbitrary number
 of person or item covariates and multilevel structure if required. Prior
-knowledge can be included in the form prior distribution, which constitute an
+knowledge can be included in the form prior distributions, which constitute an
 essential part of every Bayesian model. Estimation is performed in
 \proglang{Stan} using MCMC sampling via adaptive Hamiltonian Monte Carlo
 [@hoffman2014; @stanM2019], an efficient and stable algorithm that works well in
-high dimensional, highly correlated parameter spaces. Although the \pkg{brms}
-framework does not only focus on IRT models, recent developments and new
-features presented in this paper make it particularily appealing for fitting
-those models.
-
-Multi-purpose statistical software, especially one with a scope as general as
-\pkg{brms}, offers the advantage of easily generalizing more commonly employed
-IRT models, for instance, by means of including complex non-linear terms or
-predicting additional parameters, which are otherwise assumed constant across
-observations. \pkg{brms} offers the nearly unrestricted combination of different
-predictor terms and distributions implemented in the package. This is not only
+high dimensional, highly correlated parameter spaces. 
+The flexbility of the proposed framework is not only
 helpful to the applied researcher who wishes to analyze their IRT data by means
 of one single package, but it is also provides an opportunity for more
 methodologically interested researchers who strive to develop new IRT models or
 model variants. \pkg{brms} could be a powerful and convenient tool to implement
-them in a Bayesian framework.
+them in a Bayesian context. However, it arguably requires more work from the user
+at the start to get familiar with the modeling syntax and post-processing
+options and probably has a much steeper learning curve than more
+specialized IRT packages.
 
-The paper is structured as follows: In Section \ref{model}, I describe the
-model structure of the proposed framework and, in Section \ref{brms}, the
-advanced \proglang{R} formula syntax to specify IRT models in that framework. In
-Section \ref{estimation}, I discuss how models are estimated and post-processed
-before I continue with several hands-on examples in Section \ref{examples}.
-I provide a comparison of IRT supporting \proglang{R} packages in
-Section \ref{comparison} and end with a conclusion in Section \ref{conclusion}.
+This paper has three central purposes. First, it provides a thorough conceptual
+introduction to the proposed Bayesian IRT framework. Second, it demonstrates how
+this framework is implemented in statistical software. Third, based on several
+hands-on examples, it explains how the software can be used in practice to solve
+real-world questions. On the conceptual side, in Section
+\ref{model}, I substantially extend the work of @deboeck2011, who initially
+opened up the road for the estimation of IRT models via multilevel models. 
+However, they only considered generalized linear multilevel models and
+specifically focussed on binary data. I extend their framework in various
+directions, most notably to (a) a much larger number of response distributions,
+(b) non-linear IRT models, which do not make the assumption of the predictor
+term being of a (generalized) linear form, and (c) distributional IRT models, in which
+not only the main location parameter of the response distribution but also all
+other parameters may depend on item and person properties. On the
+software side, in Section \ref{brms} and \ref{estimation}, I introduce several
+new features in \pkg{brms} that have been implemented after the publication of
+its second paper [@brms2] to both support the presented framework in its entirety
+and provide several more specific features designed to make important IRT model
+classes possible within the framework. These features include the full
+integration of non-linear and distributional parameter predictions via a nested
+non-linear formula syntax, the implementation of several distributions designed
+for response times data, and extentions of distributions for ordinal data, for
+example for the purpose of modeling discrimination parameters. To help users
+applying the present framework and related software in practice, several
+hands-on examples are discussed in detail in Section \ref{examples}. I provide a
+comparison of IRT supporting \proglang{R} packages in Section \ref{comparison}
+and end with a conclusion in Section \ref{conclusion}. All materials
+related to this paper are hosted on GitHub 
+(\url{https://github.com/paul-buerkner/Bayesian-IRT-paper}).
 
 # Model description {#model}
 
@@ -139,10 +155,11 @@ $$
 to stress the dependency on the $n\textsuperscript{th}$ observation. In most
 \proglang{R} packages, the response distribution is called the model
 \code{family} and I adopt this term in \pkg{brms}. Writing down the model per
-observation $n$ implies that we think of the data in long rather than in wide
+observation $n$ implies that we have think of the data in long rather than in wide
 format. That is, reponses to different items go in the same column of the data
 set rather than in different columns. The long format works well in combination
-with multilevel formula syntax and is arguably also more favourable from a programatical perspective [e.g., see @wickham2016].
+with multilevel formula syntax and is arguably also more favourable from a 
+programatical perspective [e.g., see @wickham2016].
 
 ## Response distributions {#respdists}
 
@@ -1066,28 +1083,27 @@ person ability. Otem and person parameters are displayed in Figure
 \ref{fig:coef-item-va-1pl} and \ref{fig:coef-person-va-1pl}, respectively.
 
 ```{r coef-item-va-1pl, echo=FALSE, fig.width=8, fig.cap = "Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_1pl}."}
-coef_fit_va_1pl <- coef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
+coef_fit_va_1pl <- coef(fit_va_1pl)
 coef_fit_va_1pl$item[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
-	select(-Est.Error) %>%
 	rename(item = "rowname") %>%
 	mutate(item = as.numeric(item)) %>%
-	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(item, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	geom_pointrange() +
 	coord_flip() +
 	labs(x = "Item Number")
 ```
 
 ```{r coef-person-va-1pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_1pl}."}
-ranef_va_1pl <- ranef(fit_va_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_1pl <- ranef(fit_va_1pl)
 ranef_va_1pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
 	arrange(Estimate) %>%
 	mutate(id = seq_len(n())) %>%
-	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(id, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	geom_pointrange(alpha = 0.7) +
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
@@ -1185,7 +1201,7 @@ although their estimates are now more uncertain and spread out as a result of
 also estimating the discriminations.
 
 ```{r coef-item-va-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap="Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_2pl}."}
-coef_fit_va_2pl <- coef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
+coef_fit_va_2pl <- coef(fit_va_2pl)
 eta <- coef_fit_va_2pl$item[, , "eta_Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column()
@@ -1198,7 +1214,7 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 	rename(item = "rowname") %>%
 	mutate(item = as.numeric(item)) %>%
 	mutate(nlpar = factor(nlpar, labels = c("Easiness", "Discrimination"))) %>%
-	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(item, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	facet_wrap("nlpar", scales = "free_x") +
 	geom_pointrange() +
 	coord_flip() +
@@ -1206,14 +1222,14 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 ```
 
 ```{r coef-person-va-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_2pl}."}
-ranef_va_2pl <- ranef(fit_va_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_2pl <- ranef(fit_va_2pl)
 ranef_va_2pl$id[, , "eta_Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
 	arrange(Estimate) %>%
 	mutate(id = seq_len(n())) %>%
-	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(id, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	geom_pointrange(alpha = 0.7) +
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
@@ -1679,14 +1695,14 @@ people's mind -- but also statistically by increasing the precision of the
 estimates.
 
 ```{r coef-person-va-ord-1pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_1pl}."}
-ranef_va_ord_1pl <- ranef(fit_va_ord_1pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_ord_1pl <- ranef(fit_va_ord_1pl)
 ranef_va_ord_1pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
 	arrange(Estimate) %>%
 	mutate(id = seq_len(n())) %>%
-	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(id, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	geom_pointrange(alpha = 0.7) +
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
@@ -1792,7 +1808,7 @@ Figure \ref{fig:coef-item-va-ord-2pl}, in which we clearly see
 that discrimination does not vary across items in the GRM either.
 
 ```{r coef-item-va-ord-2pl, echo=FALSE, fig.width=8, fig.height = 4, fig.cap="Posterior means and 95\\% credible intervals of item parameters as estimated by model \\code{fit\\_va\\_ord\\_2pl}."}
-coef_fit_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
+coef_fit_va_ord_2pl <- ranef(fit_va_ord_2pl)
 eta <- coef_fit_va_ord_2pl$item[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column()
@@ -1805,7 +1821,7 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 	rename(item = "rowname") %>%
 	mutate(item = as.numeric(item)) %>%
 	mutate(nlpar = factor(nlpar, labels = c("Easiness", "Discrimination"))) %>%
-	ggplot(aes(item, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(item, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	facet_wrap("nlpar", scales = "free_x") +
 	geom_pointrange() +
 	coord_flip() +
@@ -1813,14 +1829,14 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 ```
 
 ```{r coef-person-va-ord-2pl, include=FALSE, echo=FALSE, fig.width=8, fig.height = 4, fig.cap = "Posterior means and 95\\% credible intervals of person parameters (sorted) as estimated by model \\code{fit\\_va\\_ord\\_2pl}."}
-ranef_va_ord_2pl <- ranef(fit_va_ord_2pl, robust = TRUE, probs = c(0.05, 0.95))
+ranef_va_ord_2pl <- ranef(fit_va_ord_2pl)
 ranef_va_ord_2pl$id[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
 	arrange(Estimate) %>%
 	mutate(id = seq_len(n())) %>%
-	ggplot(aes(id, Estimate, ymin = Q5, ymax = Q95)) +
+	ggplot(aes(id, Estimate, ymin = Q2.5, ymax = Q97.5)) +
 	geom_pointrange(alpha = 0.7) +
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
@@ -2306,14 +2322,15 @@ models developed in the statistical literature, we may actually find an
 available on the Psychometrics CRAN task view
 (\url{https://cran.r-project.org/web/views/Psychometrics.html}). Comparing all
 of them to \pkg{brms} would be too extensive and barely helpful for the purpose
-of the present paper. Accordingly, I focus on a set of seven widely applied and
+of the present paper. Accordingly, I focus on a set of eight widely applied and
 actively maintained packages that can be used for IRT modeling. These are
 \pkg{eRm} [@eRm], \pkg{ltm} [@ltm], \pkg{TAM} [@TAM], \pkg{mirt} [@mirt],
-\pkg{sirt} [@sirt], \pkg{lme4} [@lme4], and \pkg{lavaan} [@lavaan]. All of these
-packages are of high quality, user friendly, and well documented so I primarily
-focus my comparison on the features they support. A high level overview of the
-modeling options of each package can be found in Table \ref{tab:pkg-compare} and
-more details are provided below.
+\pkg{sirt} [@sirt], \pkg{lme4} [@lme4], \pkg{lavaan} [@lavaan], 
+and \pkg{blavaan} [@blavaan]. 
+All of these packages are of high quality, user friendly, and well
+documented so I primarily focus my comparison on the features they support. A
+high level overview of the modeling options of each package can be found in
+Table \ref{tab:pkg-compare} and more details are provided below.
 
 \pkg{eRm} focuses on models that can be estimated
 using conditional maximum likelihood, a method only available for the 1PL model
@@ -2325,15 +2342,20 @@ maximum likelihood estimation. They allow estimating discrimination parameters
 for all these model classes as well as 3PL or even 4PL models for binary
 responses. Of these three packages, \pkg{mirt}
 currently provides the most flexible framework with respect to both the models
-it can fit and the provided estimation algorithms. The package also comes with its own
-modeling syntax for easy specification of factor structure and parameter
+it can fit and the provided estimation algorithms. The package also comes with
+its own modeling syntax for easy specification of factor structure and parameter
 constraints. The \pkg{sirt} package, does not provide one single framework for
 IRT models but rather a large set of separate functions to fit special IRT
 models that complement and support other packages, in particular \pkg{mirt} and
 \pkg{TAM}. As a result, input and output structures are not consistent across
 model fitting functions within \pkg{sirt}, which makes it more complicated to
 switch between model classes. All of these IRT-specific packages have built-in
-methods for investigating and testing differential item functioning.
+methods for investigating and testing differential item functioning. In addition
+to these tools, a powerful approach for assessing differential item functioning
+via recursive partioning is implemented in \pkg{psychotree}
+[@psychotree1;@psychotree2] based on methods of the \pkg{psychotools} package
+[@psychotools]. It currently supports methods for dichotomous, categorical and
+ordinal models.
 
 In contrast to the above packages, \pkg{lavaan} and \pkg{lme4} are not
 specifically dedicated to IRT modelling, but rather provide general frameworks
@@ -2342,11 +2364,14 @@ generality and user-friendly interfaces, they have established themselves as the
 de facto standards in \proglang{R} when it comes to the frequentist estimation
 of these model classes. \pkg{lavaan} allows to fit multidimensional 1PL and 2PL
 binary, categorical and some ordinal IRT models using maximum likelihood or
-weighted least squares estimations. \pkg{lme4} estimates multilevel models via
-marginal maximum likelihood estimation. While it is very flexible in the
+weighted least squares estimations. In addition, the \pkg{blavaan} package
+allows to fit \pkg{lavaan} models using Bayesian estimation methods.
+To date, not all \pkg{lavaan} models are available in \pkg{blavaan}, but I
+expect this to change in the future. \pkg{lme4} estimates multilevel models
+via marginal maximum likelihood estimation. While it is very flexible in the
 specification of covariates and multilevel structure, for instance for the
-purpose of multidimensional IRT models, it neither supports 2PL (or more parameters)
-binary models, nor categorical or ordinal models.
+purpose of multidimensional IRT models, it neither supports 2PL (or more
+parameters) binary models, nor categorical or ordinal models.
 
 \pkg{brms} is conceptually closest to \pkg{lme4} when it comes to the model
 specification and data structuring. These two packages expect the data to be in
@@ -2377,26 +2402,62 @@ of the non-linear multilevel syntax. In addition, multiple different response
 variables can be combined in a joint multivariate model in order to let person
 and/or item parameters inform each other, respectively, across response variables.
 
-Another difference between \pkg{brms} and the other packages is that the former
-is fully Bayesian while the latter are mostly based point estimation methods.
-\pkg{TAM} and \pkg{mirt} support setting certain prior distributions on
+Another difference between \pkg{brms} and most of the other packages is that the
+former is fully Bayesian while the latter are mostly based point estimation
+methods. \pkg{TAM} and \pkg{mirt} support setting certain prior distributions on
 parameters but still perform estimation via optimization. \pkg{sirt} offers MCMC
 sampling only for 2PL and 3PL models with restrictive prior options and few
-built-in methods to post-process results. While performing full Bayesian
-inference via MCMC sampling is often orders of magnitude slower than point
-estimation via maximum likelihood or least squares, the obtained information may
-be considered to be much higher: Not only do we get the posterior distribution
-of all model parameters, but also the posterior distribution of all quantities
-that can be computed on their basis [@gelman2013]. For instance, the uncertainty
-in the paramters' posterior naturally propagates to the posterior predictive
+built-in methods to post-process results. Similarily, \pkg{blavaan} can fit a
+subset of the models supported by \pkg{lavaan} using MCMC methods implemented in
+\proglang{JAGS} [@jags] or \proglang{Stan} [@carpenter2017] although the set of supported
+IRT models is currently much smaller than that of \pkg{brms} (see Table
+\ref{tab:pkg-compare}). While performing full Bayesian inference via MCMC
+sampling is often orders of magnitude slower than point estimation via maximum
+likelihood or least squares, the obtained information may be considered to be
+much higher: Not only do we get the posterior distribution of all model
+parameters, but also the posterior distribution of all quantities that can be
+computed on their basis [@gelman2013]. For instance, the uncertainty in the
+parameters' posterior naturally propagates to the posterior predictive
 distributions, whose uncertainty can then be visualized along with the mean
 predictions. \pkg{brms} automates a lot of common post-processing tasks, such as
 posterior visualizations, predictions, and model comparison (see
-\code{methods(class = "brmsfit")} for a full list of options).
+\code{methods(class = "brmsfit")} for a full list of options and
+the replication material of this paper for examples).
+
+How much the increased information obtained via full Bayesian inference is worth
+the additional computational costs and corresponding waiting time depends on
+various factors related to the model, data, and goal of inference. For instance, if the
+model is relatively simple and there is a lot of data available to inform the
+model parameters, Bayesian and maximum likelihood estimates are unlikely to
+differ a lot unless strong prior information is provided. Also, if the goal is
+to provide estimates in real time, for instance for the purpose of adaptive
+testing, full Bayesian inference may be too slow to be viable unless
+specifically tuned to such a task [e.g., see @vanderlinen2015]. 
+I do not advocate that a Bayesian approach to IRT is always superior, but
+instead want to point out its strengths so that users can make an informed
+decision as to when working with a Bayesian framework may improve the desired
+inference.
+
+Similarily, while using general purpose frameworks for IRT such as those
+provided by \pkg{brms}, \pkg{lme4}, or \pkg{lavaan} may provide advantages in
+terms of modeling flexibility and consistency of model specification and
+post-processing, they clearly come with some disadvantages. Among others, such
+general frameworks are likely to require more work from the user at the start to get
+familiar with the interface in order to fit the desired models as compared to
+packages with specific built-in function for common model classes. At the same
+time, post-processing methods of specialized software may be easier and more
+directly applicable to common use-cases, thus lowering the requirements in the
+actual coding expertise of users. For instance, the specification and
+post-processing of standard 1PL or 2PL models is more straightforward in
+dedicated IRT software and users only interested in such models may get reliable
+solutions faster this way. In other words, when introducing more and more
+general frameworks, the goal is not to render more specialized software
+irrelevant, but to provide an alternative for consistent model building an
+evaluation with a larger scope than specialized software is intended for.
 
 ```{r, echo=FALSE}
 pcom <- tibble(
-	Feature = c("eRm", "ltm", "TAM", "mirt", "sirt", "lavaan", "lme4", "brms"),
+	Feature = c("eRm", "ltm", "TAM", "mirt", "sirt", "(b)lavaan", "lme4", "brms"),
 	"1-PLM" = rep("yes", 8),
 	"2-PLM" = c("no", "yes", "yes", "yes", "yes", "yes", "no", "yes"),
 	"3-PLM" = c("no", "yes", "yes", "yes", "yes", "no", "no", "yes"),
@@ -2407,7 +2468,7 @@ pcom <- tibble(
   LM = c("no", "no", "no", "no", "yes", "yes", "yes", "yes"),
 	CoM = c("no", "no", "no", "no", "no", "no", "yes", "yes"),
 	RTM = c("no", "no", "no", "no", "no", "limited", "limited", "yes"),
-	PrM = c(rep("no", 7), "yes"),
+	PrM = c("no", "no", "no", "no", "no", "no", "no", "yes"),
 	Multidimensional = c("no", "no", "yes", "yes", "yes", "yes", "yes", "yes"),
 	Covariates = rep("yes", 8),
 	Constraints = c("no" , "yes", "yes", "yes", "yes", "yes", "limited", "limited"),
