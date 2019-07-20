@@ -108,7 +108,7 @@ of one single package, but it is also provides an opportunity for more
 methodologically interested researchers who strive to develop new IRT models or
 model variants. \pkg{brms} could be a powerful and convenient tool to implement
 them in a Bayesian context. However, it arguably requires more work from the user
-at the start to get familiar with the modeling syntax and post-processing
+at the start to familiarize themselves with the modeling syntax and post-processing
 options and probably has a much steeper learning curve than more
 specialized IRT packages.
 
@@ -2335,8 +2335,8 @@ Table \ref{tab:pkg-compare} and more details are provided below.
 \pkg{eRm} focuses on models that can be estimated
 using conditional maximum likelihood, a method only available for the 1PL model
 and PCM with unidimensional latent traits per person. Accordingly, its
-application is rather limited compared to those of the other packages presented
-here. The \pkg{ltm}, \pkg{TAM}, and \pkg{mirt} packages all provide frameworks
+application is the most specialized among all the packages presented here. 
+The \pkg{ltm}, \pkg{TAM}, and \pkg{mirt} packages all provide frameworks
 for fitting binary, categorical, and ordinal models using mostly marginal
 maximum likelihood estimation. They allow estimating discrimination parameters
 for all these model classes as well as 3PL or even 4PL models for binary
@@ -2424,7 +2424,7 @@ posterior visualizations, predictions, and model comparison (see
 \code{methods(class = "brmsfit")} for a full list of options and
 the replication material of this paper for examples).
 
-How much the increased information obtained via full Bayesian inference is worth
+To what extent the increased information obtained via full Bayesian inference is worth
 the additional computational costs and corresponding waiting time depends on
 various factors related to the model, data, and goal of inference. For instance, if the
 model is relatively simple and there is a lot of data available to inform the
@@ -2432,9 +2432,9 @@ model parameters, Bayesian and maximum likelihood estimates are unlikely to
 differ a lot unless strong prior information is provided. Also, if the goal is
 to provide estimates in real time, for instance for the purpose of adaptive
 testing, full Bayesian inference may be too slow to be viable unless
-specifically tuned to such a task [e.g., see @vanderlinen2015]. 
-I do not advocate that a Bayesian approach to IRT is always superior, but
-instead want to point out its strengths so that users can make an informed
+specifically tuned to such a task [e.g., see @vanderlinen2015]. I do not argue
+that a Bayesian approach to IRT is always superior, but instead want to point
+out its strengths (and also its weaknesses) so that users can make an informed
 decision as to when working with a Bayesian framework may improve the desired
 inference.
 
@@ -2442,12 +2442,12 @@ Similarily, while using general purpose frameworks for IRT such as those
 provided by \pkg{brms}, \pkg{lme4}, or \pkg{lavaan} may provide advantages in
 terms of modeling flexibility and consistency of model specification and
 post-processing, they clearly come with some disadvantages. Among others, such
-general frameworks are likely to require more work from the user at the start to get
-familiar with the interface in order to fit the desired models as compared to
-packages with specific built-in function for common model classes. At the same
-time, post-processing methods of specialized software may be easier and more
-directly applicable to common use-cases, thus lowering the requirements in the
-actual coding expertise of users. For instance, the specification and
+general frameworks are likely to require more work from the user at the start to
+familiarize themselves with the interface in order to fit the desired models as
+compared to packages with specific built-in function for common model classes.
+At the same time, post-processing methods of specialized software may be easier
+and more directly applicable to common use-cases, thus lowering the requirements
+in the actual coding expertise of users. For instance, the specification and
 post-processing of standard 1PL or 2PL models is more straightforward in
 dedicated IRT software and users only interested in such models may get reliable
 solutions faster this way. In other words, when introducing more and more
