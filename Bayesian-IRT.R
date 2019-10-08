@@ -44,7 +44,7 @@ plot(fit_va_1pl, ask = FALSE)
 # extract item parameters
 (item_pars_va_1pl <- coef(fit_va_1pl)$item)
 
-# plot person parameters
+# plot item parameters
 item_pars_va_1pl[, , "Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
@@ -154,10 +154,10 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 
 
 # extract person parameters
-(ranef_va_2pl <- ranef(fit_va_2pl)$id)
+(person_pars_va_2pl <- ranef(fit_va_2pl)$id)
 
 # plot person parameters
-ranef_va_2pl[, , "eta_Intercept"] %>%
+person_pars_va_2pl[, , "eta_Intercept"] %>%
 	as_tibble() %>%
 	rownames_to_column() %>%
 	select(-Est.Error) %>%
