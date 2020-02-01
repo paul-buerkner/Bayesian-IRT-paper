@@ -1,3 +1,12 @@
+# This script requires brms version 2.11.5 or higher to full run.
+
+# The current release version of brms can be installed via
+# install.packages("brms)
+
+# The current developmental version of brms can be installed via
+# remotes::install_github("paul-buerkner/brms")
+
+
 # load required pacakges
 library(tidyverse)
 library(brms)
@@ -10,8 +19,12 @@ theme_set(bayesplot::theme_default())
 
 # set rstan options
 rstan::rstan_options(auto_write = TRUE)
-options(mc.cores = min(4, parallel::detectCores()))
+options(mc.cores = 2)
 
+# Although I set a seed for all models, the results are only exactly
+# reproducible on the same operating system with the same C++ compiler 
+# and version. Thus, when you run the code below, it will not produce
+# exactly the same results as shown in the paper.
 
 # ----------- Code for Section 5.1 ------------
 # Analysis of the VerbAgg data set using dichotomous IRT models
@@ -34,7 +47,8 @@ fit_va_1pl <- brm(
   formula = formula_va_1pl,
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 
 # obtain basic summaries
@@ -110,7 +124,7 @@ formula_va_2pl <- bf(
 prior_va_2pl <- 
   prior("normal(0, 5)", class = "b", nlpar = "eta") +
   prior("normal(0, 1)", class = "b", nlpar = "logalpha") +
-  prior("normal(0, 3)", class = "sd", group = "id", nlpar = "eta") + 
+  prior("constant(1)", class = "sd", group = "id", nlpar = "eta") + 
   prior("normal(0, 3)", class = "sd", group = "item", nlpar = "eta") +
   prior("normal(0, 1)", class = "sd", group = "item", nlpar = "logalpha")
 
@@ -120,6 +134,7 @@ fit_va_2pl <- brm(
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_2pl,
+  seed = 1234
 )
 
 # obtain some basic summaries
@@ -168,36 +183,10 @@ person_pars_va_2pl[, , "eta_Intercept"] %>%
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
 
-
-# specify a model with constant but estimated discrimination
-formula_va_1pl_alpha <- bf(
-	r2 ~ exp(logalpha) * eta,
-	eta ~ 1 + (1 | item) + (1 | id),
-	logalpha ~ 1,
-	nl = TRUE
-)
-
-# specify some weakly informative priors
-prior_va_1pl_alpha <- 
-	prior("normal(0, 5)", class = "b", nlpar = "eta") +
-	prior("normal(0, 1)", class = "b", nlpar = "logalpha") +
-	prior("normal(0, 3)", class = "sd", group = "id", nlpar = "eta") + 
-	prior("normal(0, 3)", class = "sd", group = "item", nlpar = "eta")
-
-# fit the model
-fit_va_1pl_alpha <- brm(
-	formula = formula_va_1pl_alpha,
-  data = VerbAgg, 
-	family = brmsfamily("bernoulli", "logit"),
-	prior = prior_va_1pl_alpha,
-	inits = 0
-)
-
 # perform model comparison via approximate LOO-CV
 loo_va_1pl <- loo(fit_va_1pl)
-loo_va_1pl_alpha <- loo(fit_va_1pl_alpha)
 loo_va_2pl <- loo(fit_va_2pl)
-loo_va_compare <- loo_compare(loo_va_1pl, loo_va_1pl_alpha, loo_va_2pl)
+loo_va_compare <- loo_compare(loo_va_1pl, loo_va_2pl)
 print(loo_va_compare, simplify = FALSE)
 
 
@@ -211,7 +200,8 @@ fit_va_1pl_cov1 <- brm(
   formula = formula_va_1pl_cov1,
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 
 summary(fit_va_1pl_cov1)
@@ -230,11 +220,32 @@ fit_va_1pl_cov2 <- brm(
   formula = formula_va_1pl_cov2,
   data = VerbAgg, 
   family = brmsfamily("bernoulli", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 
 summary(fit_va_1pl_cov2)
 plot(marginal_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender")), ask = FALSE)
+
+
+# perform explicit DIF analysis
+# compute the DIF covariate
+VerbAgg$dif <- as.numeric(with(
+	VerbAgg, Gender == "F" & mode == "do" & btype %in% c("curse", "scold")
+))
+
+# fit and summarize the DIF model
+formula_va_1pl_dif1 <- bf(
+	r2 ~ Gender + dif + (1 | item) + (1 | id)
+)
+fit_va_1pl_dif1 <- brm(
+	formula = formula_va_1pl_dif1,
+	data = VerbAgg, 
+	family = brmsfamily("bernoulli", "logit"),
+	prior = prior_va_1pl,
+	file = "models/fit_va_1pl_dif1"
+)
+summary(fit_va_1pl_dif1)
 
 
 # compare convergence of lme4 and brms for a complex covariate model
@@ -252,13 +263,13 @@ fit_va_1pl_cov_full <- brm(
 	  (1 + Anger + Gender | item) + (1 + btype + situ + mode  | id),
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 summary(fit_va_1pl_cov_full)
 
 
 # ---------- 3PL models ----------------------
-
 # 3PL model with known guessing parameter
 formula_va_3pl <- bf(
   r2 ~ 0.25 + 0.75 * inv_logit(exp(logalpha) * eta),
@@ -289,7 +300,8 @@ fit_va_ord_1pl <- brm(
   formula = formula_va_ord_1pl,
   data = VerbAgg,
   family = brmsfamily("cumulative", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 
 summary(fit_va_ord_1pl)
@@ -309,6 +321,28 @@ ranef_va_ord_1pl$id[, , "Intercept"] %>%
 	coord_flip() +
 	labs(x = "Person Number (Sorted)")
 
+
+# -------------- ordinal 1PL models with varying thresholds ----------
+# specify a GRM with varying thresholds across items
+formula_va_ord_thres_1pl <- bf(resp | thres(gr = item) ~ 1 + (1 | id))
+prior_va_ord_thres_1pl <- 
+	prior("normal(0, 3)", class = "Intercept") + 
+	prior("normal(0, 3)", class = "sd", group = "id")
+
+fit_va_ord_thres_1pl <- brm(
+	formula = formula_va_ord_thres_1pl,
+	data = VerbAgg,
+	family = brmsfamily("cumulative", "logit"),
+	prior = prior_va_ord_thres_1pl,
+	inits = 0, chains = 2,
+	seed = 1234
+)
+summary(fit_va_ord_thres_1pl)
+
+# perform model comparison
+loo(fit_va_ord_1pl, fit_va_ord_thres_1pl)
+
+
 # -------------- ordinal 2PL models ---------------
 # specify a GRM with varying discriminations
 formula_va_ord_2pl <- bf(
@@ -318,7 +352,7 @@ formula_va_ord_2pl <- bf(
 
 # some weakly informative priors
 prior_va_ord_2pl <- 
-  prior("normal(0, 3)", class = "sd", group = "id") + 
+  prior("constant(1)", class = "sd", group = "id") + 
   prior("normal(0, 3)", class = "sd", group = "item") +
   prior("normal(0, 1)", class = "sd", group = "item", dpar = "disc")
 
@@ -327,7 +361,8 @@ fit_va_ord_2pl <- brm(
   formula = formula_va_ord_2pl,
   data = VerbAgg,
   family = brmsfamily("cumulative", "logit"),
-  prior = prior_va_ord_2pl
+  prior = prior_va_ord_2pl,
+  seed = 1234
 )
 summary(fit_va_ord_2pl)
 
@@ -378,7 +413,8 @@ fit_va_ord_cov1 <- brm(
   formula = formula_va_ord_cov1,
   data = VerbAgg, 
   family = brmsfamily("cumulative", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 summary(fit_va_ord_cov1)
 
@@ -397,7 +433,8 @@ fit_va_ord_cov2 <- brm(
   formula = formula_va_ord_cov2,
   data = VerbAgg, 
   family = brmsfamily("acat", "logit"),
-  prior = prior_va_1pl
+  prior = prior_va_1pl,
+  seed = 1234
 )
 
 # summarize the results
@@ -442,7 +479,8 @@ fit_exg1 <- brm(
   bform_exg1, data = rotation,
   family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
   chains = 4, cores = 4, inits = 0,
-  control = list(adapt_delta = 0.99)
+  control = list(adapt_delta = 0.99),
+  seed = 1234
 )
 
 # summarize the results
@@ -475,7 +513,8 @@ fit_drift1 <- brm(
   family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
   chains = chains, cores = chains,
   inits = inits_drift, init_r = 0.05,
-  control = list(adapt_delta = 0.99)
+  control = list(adapt_delta = 0.99),
+  seed = 1234
 )
 
 # summarize the model
@@ -505,7 +544,8 @@ fit_drift2 <- brm(
 	family = wiener("log", link_bs = "log", link_ndt = "log"),
 	chains = chains, cores = chains,
 	inits = inits_diff, init_r = 0.05,
-	control = list(adapt_delta = 0.99)
+	control = list(adapt_delta = 0.99),
+	seed = 1234
 )
 
 # perform model comparison via approximate LOO-CV
