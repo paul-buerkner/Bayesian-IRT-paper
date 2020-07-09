@@ -1,4 +1,4 @@
-# This script requires brms version 2.11.5 or higher to full run.
+# This script requires brms version 2.11.5 or higher to fully run.
 
 # The current release version of brms can be installed via
 # install.packages("brms)
@@ -7,7 +7,7 @@
 # remotes::install_github("paul-buerkner/brms")
 
 
-# load required pacakges
+# load required packages
 library(tidyverse)
 library(brms)
 # for comparison with brms
@@ -20,6 +20,12 @@ theme_set(bayesplot::theme_default())
 # set rstan options
 rstan::rstan_options(auto_write = TRUE)
 options(mc.cores = 2)
+
+# create a "models" folder in the current working directory
+# to store fitted model objects for easier re-usage
+if (!dir.exists("models")) {
+	dir.create("models")
+}
 
 # Although I set a seed for all models, the results are only exactly
 # reproducible on the same operating system with the same C++ compiler 
@@ -48,12 +54,17 @@ fit_va_1pl <- brm(
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_1pl"
 )
 
 # obtain basic summaries
 summary(fit_va_1pl)
 plot(fit_va_1pl, ask = FALSE)
+
+# extract person parameters
+ranef_va_1pl <- ranef(fit_va_1pl)
+(person_pars_va_1pl <- ranef_va_1pl$id)
 
 # extract item parameters
 (item_pars_va_1pl <- coef(fit_va_1pl)$item)
@@ -68,9 +79,6 @@ item_pars_va_1pl[, , "Intercept"] %>%
 	geom_pointrange() +
 	coord_flip() +
 	labs(x = "Item Number")
-
-# extract person parameters
-(person_pars_va_1pl <- ranef(fit_va_1pl)$id)
 
 # plot person parameters
 person_pars_va_1pl[, , "Intercept"] %>%
@@ -129,12 +137,15 @@ prior_va_2pl <-
   prior("normal(0, 1)", class = "sd", group = "item", nlpar = "logalpha")
 
 # fit the 2PL model
+# this models throws some convergence warnings which are false
+# positives and can be safely ignored
 fit_va_2pl <- brm(
   formula = formula_va_2pl,
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_2pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_2pl"
 )
 
 # obtain some basic summaries
@@ -167,9 +178,9 @@ bind_rows(eta, alpha, .id = "nlpar") %>%
 	coord_flip() +
 	labs(x = "Item Number")
 
-
 # extract person parameters
-(person_pars_va_2pl <- ranef(fit_va_2pl)$id)
+ranef_va_2pl <- ranef(fit_va_2pl)
+(person_pars_va_2pl <- ranef_va_2pl$id)
 
 # plot person parameters
 person_pars_va_2pl[, , "eta_Intercept"] %>%
@@ -201,11 +212,12 @@ fit_va_1pl_cov1 <- brm(
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_1pl_cov1"
 )
 
 summary(fit_va_1pl_cov1)
-marginal_effects(fit_va_1pl_cov1, "mode")
+conditional_effects(fit_va_1pl_cov1, "mode")
 
 # compare standard deviations
 hyp <- "modedo - modewant > 0"
@@ -221,11 +233,12 @@ fit_va_1pl_cov2 <- brm(
   data = VerbAgg, 
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_1pl_cov2"
 )
 
 summary(fit_va_1pl_cov2)
-plot(marginal_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender")), ask = FALSE)
+plot(conditional_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender")), ask = FALSE)
 
 
 # perform explicit DIF analysis
@@ -243,6 +256,7 @@ fit_va_1pl_dif1 <- brm(
 	data = VerbAgg, 
 	family = brmsfamily("bernoulli", "logit"),
 	prior = prior_va_1pl,
+	seed = 1234,
 	file = "models/fit_va_1pl_dif1"
 )
 summary(fit_va_1pl_dif1)
@@ -264,7 +278,8 @@ fit_va_1pl_cov_full <- brm(
   data = VerbAgg,
   family = brmsfamily("bernoulli", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_1pl_cov_full"
 )
 summary(fit_va_1pl_cov_full)
 
@@ -295,13 +310,16 @@ formula_va_3pl <- bf(
 # fit ordinal models to the VerbAgg data
 
 # specify a basic GRM
+# this models throws some convergence warnings which are false
+# positives and can be safely ignored
 formula_va_ord_1pl <- bf(resp ~ 1 + (1 | item) + (1 | id))
 fit_va_ord_1pl <- brm(
   formula = formula_va_ord_1pl,
   data = VerbAgg,
   family = brmsfamily("cumulative", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_ord_1pl"
 )
 
 summary(fit_va_ord_1pl)
@@ -329,13 +347,16 @@ prior_va_ord_thres_1pl <-
 	prior("normal(0, 3)", class = "Intercept") + 
 	prior("normal(0, 3)", class = "sd", group = "id")
 
+# this models throws some convergence warnings which are false
+# positives and can be safely ignored
 fit_va_ord_thres_1pl <- brm(
 	formula = formula_va_ord_thres_1pl,
 	data = VerbAgg,
 	family = brmsfamily("cumulative", "logit"),
 	prior = prior_va_ord_thres_1pl,
 	inits = 0, chains = 2,
-	seed = 1234
+	seed = 1234,
+	file = "models/fit_va_ord_thres_1pl"
 )
 summary(fit_va_ord_thres_1pl)
 
@@ -357,12 +378,15 @@ prior_va_ord_2pl <-
   prior("normal(0, 1)", class = "sd", group = "item", dpar = "disc")
 
 # fit the model
+# this models throws some convergence warnings which are false
+# positives and can be safely ignored
 fit_va_ord_2pl <- brm(
   formula = formula_va_ord_2pl,
   data = VerbAgg,
   family = brmsfamily("cumulative", "logit"),
   prior = prior_va_ord_2pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_ord_2pl"
 )
 summary(fit_va_ord_2pl)
 
@@ -405,6 +429,8 @@ cbind(
 
 # ------- ordinal models with covariates -------------------
 # fit a GRM with person and item covariates
+# this models throws some convergence warnings which are false
+# positives and can be safely ignored
 formula_va_ord_cov1 <- bf(
 	resp ~ Anger + Gender + btype + situ + mode + mode:Gender +
 	(0 + Gender | item) + (0 + mode | id)
@@ -414,12 +440,13 @@ fit_va_ord_cov1 <- brm(
   data = VerbAgg, 
   family = brmsfamily("cumulative", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_ord_cov1"
 )
 summary(fit_va_ord_cov1)
 
 # plot effects of Anger
-marginal_effects(fit_va_ord_cov1, effects = "Anger", categorical = TRUE)
+conditional_effects(fit_va_ord_cov1, effects = "Anger", categorical = TRUE)
 
 
 # fit a PCM with covariates and a category specific effect of 'Anger'
@@ -434,12 +461,13 @@ fit_va_ord_cov2 <- brm(
   data = VerbAgg, 
   family = brmsfamily("acat", "logit"),
   prior = prior_va_1pl,
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_va_ord_cov2"
 )
 
 # summarize the results
 summary(fit_va_ord_cov2)
-marginal_effects(fit_va_ord_cov2, effects = "Anger", categorical = TRUE)
+conditional_effects(fit_va_ord_cov2, effects = "Anger", categorical = TRUE)
 
 
 
@@ -480,7 +508,8 @@ fit_exg1 <- brm(
   family = brmsfamily("exgaussian", link_sigma = "log", link_beta = "log"),
   chains = 4, cores = 4, inits = 0,
   control = list(adapt_delta = 0.99),
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_exg1"
 )
 
 # summarize the results
@@ -488,9 +517,9 @@ summary(fit_exg1)
 pp_check(fit_exg1)
 
 # visualize effects of 'rotate'
-marginal_effects(fit_exg1, "rotate", dpar = "mu")
-marginal_effects(fit_exg1, "rotate", dpar = "sigma")
-marginal_effects(fit_exg1, "rotate", dpar = "beta")
+conditional_effects(fit_exg1, "rotate", dpar = "mu")
+conditional_effects(fit_exg1, "rotate", dpar = "sigma")
+conditional_effects(fit_exg1, "rotate", dpar = "beta")
 
 
 
@@ -503,18 +532,25 @@ bform_drift1 <- bf(
 )
 
 # specify initial values to help the model start sampling
-chains <- 4
-inits_drift <- list(temp_ndt_Intercept = -3)
+# diffusion models require quite a bit of working memory
+# and running multiple chains in parallel may exceed memory
+# capacity of some standard laptops
+# for this reason, we run only a single chain here but,
+# in practice, running multiple chains is recommended for
+# increased estimation accuracy and better convergence diagnostics
+chains <- 1
+inits_drift <- list(Intercept_ndt = -3)
 inits_drift <- replicate(chains, inits_drift, simplify = FALSE)
 
 # fit the model
 fit_drift1 <- brm(
-  bform_drift, data = rotation,
+  bform_drift1, data = rotation,
   family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
   chains = chains, cores = chains,
   inits = inits_drift, init_r = 0.05,
   control = list(adapt_delta = 0.99),
-  seed = 1234
+  seed = 1234,
+  file = "models/fit_drift1"
 )
 
 # summarize the model
@@ -524,9 +560,9 @@ summary(fit_drift1)
 coef(fit_drift1)$item
 
 # plot the effect of 'rotate'
-marginal_effects(fit_drift1, "rotate", dpar = "mu")
-marginal_effects(fit_drift1, "rotate", dpar = "bs")
-marginal_effects(fit_drift1, "rotate", dpar = "ndt")
+conditional_effects(fit_drift1, "rotate", dpar = "mu")
+conditional_effects(fit_drift1, "rotate", dpar = "bs")
+conditional_effects(fit_drift1, "rotate", dpar = "ndt")
 
 
 # specify a drift diffusion model without 
@@ -543,9 +579,10 @@ fit_drift2 <- brm(
 	bform_drift2, rotation,
 	family = wiener("log", link_bs = "log", link_ndt = "log"),
 	chains = chains, cores = chains,
-	inits = inits_diff, init_r = 0.05,
+	inits = inits_drift, init_r = 0.05,
 	control = list(adapt_delta = 0.99),
-	seed = 1234
+	seed = 1234,
+	file = "models/fit_drift2"
 )
 
 # perform model comparison via approximate LOO-CV
