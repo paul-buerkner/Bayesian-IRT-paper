@@ -1787,7 +1787,7 @@ fit_va_1pl_cov2 <- add_criterion(fit_va_1pl_cov2, "loo")
 We fit the model as usual with the `brm` function. Afterwards, we obtain
 a graphical summary of the effects of the newly added person covariates via
 
-```{r eval=FALSE}
+```{r, eval=FALSE}
 conditional_effects(fit_va_1pl_cov2, c("Anger", "mode:Gender"))
 ```
 
@@ -2644,7 +2644,7 @@ due to the complexity of the diffusion model's likelihood.
 
 ```{r, eval=FALSE}
 fit_drift1 <- brm(
-  bform_drift, data = rotation, 
+  bform_drift1, data = rotation, 
   family = brmsfamily("wiener", "log", link_bs = "log", link_ndt = "log"),
   chains = chains, cores = chains,
   inits = inits_drift, init_r = 0.05,
