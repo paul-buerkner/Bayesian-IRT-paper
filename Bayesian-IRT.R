@@ -153,7 +153,7 @@ summary(fit_va_2pl)
 plot(fit_va_2pl, ask = FALSE)
 
 # extract item parameters
-(item_pars_va_1pl <- coef(fit_va_2pl)$item)
+(item_pars_va_2pl <- coef(fit_va_2pl)$item)
 
 # plot item parameters
 # difficulties
